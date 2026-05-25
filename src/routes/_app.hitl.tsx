@@ -241,7 +241,12 @@ function ValidationScreen({
   const item = items[idx];
   const allFields = useMemo(() => {
     const base = (item.fields ?? []).map((f) => ({ ...f, value: edits[`${item.id}:${f.name}`] ?? f.value }));
-    const extras = extraFields.map((e) => ({ name: e.name, value: e.value, group: e.group, confidence: 100 }));
+    const extras = extraFields.map((e) => ({
+      name: e.name,
+      value: edits[`${item.id}:${e.name}`] ?? e.value,
+      group: e.group,
+      confidence: 100,
+    }));
     return [...base, ...extras];
   }, [item, edits, extraFields]);
 

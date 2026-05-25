@@ -4,7 +4,7 @@ import {
   Check, X, ClipboardCheck, Filter, FileText, Globe,
   ChevronLeft, ChevronRight, Info, Search, SkipForward, ArrowRight, Layers, Lock,
   ZoomIn, ZoomOut, Languages, Plus, MessageSquare, Sparkles, Keyboard, History,
-  Activity, Gauge, ChevronDown, MapPin, Save, CircleDot,
+  Activity, Gauge, ChevronDown, MapPin, Save, Circle, MousePointerClick,
 } from "lucide-react";
 import { usePlatform, type HitlItem, type HitlStatus, type Job } from "@/store/platform";
 import { SOLUTIONS, getSolution } from "@/data/solutions";
@@ -229,6 +229,9 @@ function ValidationScreen({
   const [extraFields, setExtraFields] = useState<{ name: string; value: string; group: string }[]>([]);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
+  const [manualAnnot, setManualAnnot] = useState<Record<string, true>>({});
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [ctxQuery, setCtxQuery] = useState("");
   const [auditLog, setAuditLog] = useState<{ at: string; msg: string; tone: "cyan" | "success" | "danger" | "amber" }[]>(
     () => [{ at: new Date().toISOString(), msg: `Batch opened · ${items.length} records loaded from ${job.source}`, tone: "cyan" }]
   );
@@ -271,7 +274,7 @@ function ValidationScreen({
       else if (e.key === "ArrowRight" || e.key === "j") goNext();
       else if (e.key === "ArrowLeft" || e.key === "k") goPrev();
       else if (e.key === "?") setShowShortcuts((v) => !v);
-      else if (e.key === "Escape") { setSelectedField(null); setShowShortcuts(false); }
+      else if (e.key === "Escape") { setSelectedField(null); setShowShortcuts(false); setCtxMenu(null); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -393,10 +396,22 @@ function ValidationScreen({
             <span className="ml-auto text-[10px] font-mono text-muted-foreground truncate max-w-[160px]">{item.recordName}.{view}</span>
           </div>
 
-          <div className="flex-1 overflow-y-auto bg-[linear-gradient(135deg,oklch(0.96_0.005_220),oklch(0.97_0.008_180))] p-4 relative" ref={lhsRef}>
+          <div
+            className="flex-1 overflow-y-auto bg-[linear-gradient(135deg,oklch(0.96_0.005_220),oklch(0.97_0.008_180))] p-4 relative"
+            ref={lhsRef}
+            onContextMenu={(e) => {
+              const sel = window.getSelection?.();
+              const text = sel?.toString().trim() ?? "";
+              if (!text) return;
+              e.preventDefault();
+              setCtxQuery("");
+              setCtxMenu({ x: e.clientX, y: e.clientY, text });
+            }}
+          >
             <div className="absolute top-3 right-6 z-10 flex flex-col gap-1 text-[9px] font-mono">
               <span className="px-1.5 py-0.5 rounded bg-success/15 border border-success/40 text-success backdrop-blur">● SELECTED</span>
-              <span className="px-1.5 py-0.5 rounded bg-amber/15 border border-amber/40 text-amber backdrop-blur">● EXTRACTED</span>
+              <span className="px-1.5 py-0.5 rounded bg-amber/15 border border-amber/40 text-amber backdrop-blur">● AUTO-EXTRACTED</span>
+              <span className="px-1.5 py-0.5 rounded bg-card/80 border border-border text-muted-foreground backdrop-blur flex items-center gap-1"><MousePointerClick className="size-2.5" /> RIGHT-CLICK TO ANNOTATE</span>
             </div>
             <div style={{ zoom: `${zoom}%` }} className="transition-all">
               <SourceWithHighlights
@@ -507,8 +522,31 @@ function ValidationScreen({
                             className={`group cursor-pointer rounded-lg border border-l-2 ${ring} bg-card hover:bg-surface-elevated/40 transition p-2.5 ${isSelected ? "ring-2 ring-cyan/60 shadow-md" : ""}`}
                           >
                             <div className="flex items-center justify-between gap-1">
-                              <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase truncate flex items-center gap-1">
-                                {isSelected && <CircleDot className="size-2.5 text-cyan" />}
+                              <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase truncate flex items-center gap-1.5">
+                                {(() => {
+                                  const annotated = !!(f.value && String(f.value).trim());
+                                  const isManual = !!manualAnnot[cKey];
+                                  const title = !annotated
+                                    ? "Not annotated · right-click value on source to annotate"
+                                    : isManual
+                                      ? "Manually annotated · click to locate on source"
+                                      : "Auto-annotated · click to locate on source";
+                                  return (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); if (annotated) handleSelectField(f.name); }}
+                                      title={title}
+                                      className={`grid place-items-center size-3.5 rounded-full border transition shrink-0 ${
+                                        annotated
+                                          ? "bg-success border-success shadow-[0_0_0_2px_rgba(34,197,94,0.18)] hover:scale-110"
+                                          : "bg-transparent border-muted-foreground/40 hover:border-muted-foreground"
+                                      } ${isSelected ? "ring-2 ring-cyan/60" : ""}`}
+                                    >
+                                      {annotated
+                                        ? <span className="size-1.5 rounded-full bg-white" />
+                                        : <Circle className="size-2 text-muted-foreground/50" />}
+                                    </button>
+                                  );
+                                })()}
                                 {f.name}
                               </div>
                               <span className={`text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded border ${chipTone}`}>{f.confidence}%</span>
@@ -598,7 +636,91 @@ function ValidationScreen({
         </div>
       </div>
 
-      {/* Floating confidence analytics removed to keep LHS unobstructed */}
+      {/* ============ Right-click manual annotation menu ============ */}
+      {ctxMenu && (() => {
+        const W = 280, H = 340;
+        const left = Math.min(ctxMenu.x, window.innerWidth - W - 8);
+        const top = Math.min(ctxMenu.y, window.innerHeight - H - 8);
+        const unannotated = allFields.filter((f) => !f.value || !String(f.value).trim());
+        const annotated = allFields.filter((f) => f.value && String(f.value).trim());
+        const q = ctxQuery.toLowerCase();
+        const matches = (f: typeof allFields[number]) => !q || f.name.toLowerCase().includes(q) || (f.group ?? "").toLowerCase().includes(q);
+        const pick = (fname: string) => {
+          handleEdit(fname, ctxMenu.text);
+          setManualAnnot((m) => ({ ...m, [`${item.id}:${fname}`]: true }));
+          pushAudit(`Manually annotated "${fname}" ← "${ctxMenu.text.slice(0, 40)}${ctxMenu.text.length > 40 ? "…" : ""}"`, "success");
+          setCtxMenu(null);
+          setSelectedField(fname);
+        };
+        return (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setCtxMenu(null)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu(null); }} />
+            <div
+              className="fixed z-50 w-[280px] rounded-xl border border-border bg-card/95 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col"
+              style={{ left, top, maxHeight: H }}
+            >
+              <div className="px-3 py-2 border-b border-border bg-gradient-to-r from-cyan/10 to-transparent">
+                <div className="flex items-center gap-1.5 text-[10px] font-mono tracking-widest text-cyan">
+                  <MousePointerClick className="size-3" /> ASSIGN TO ATTRIBUTE
+                </div>
+                <div className="text-[11px] font-mono mt-1 truncate text-foreground" title={ctxMenu.text}>
+                  “{ctxMenu.text}”
+                </div>
+              </div>
+              <div className="p-2 border-b border-border">
+                <div className="relative">
+                  <Search className="size-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    autoFocus
+                    value={ctxQuery}
+                    onChange={(e) => setCtxQuery(e.target.value)}
+                    placeholder="Filter attributes…"
+                    className="w-full h-7 pl-7 pr-2 rounded-md bg-input border border-border text-[11px] font-mono focus:border-cyan/40 outline-none"
+                  />
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto py-1">
+                {unannotated.filter(matches).length > 0 && (
+                  <div className="px-3 py-1 text-[9px] font-mono tracking-widest text-muted-foreground uppercase">Unannotated · suggested</div>
+                )}
+                {unannotated.filter(matches).map((f) => (
+                  <button
+                    key={`u-${f.name}`}
+                    onClick={() => pick(f.name)}
+                    className="w-full text-left px-3 py-1.5 hover:bg-cyan/10 flex items-center gap-2 transition"
+                  >
+                    <Circle className="size-2.5 text-muted-foreground/60 shrink-0" />
+                    <span className="text-[11px] font-mono truncate">{f.name}</span>
+                    <span className="ml-auto text-[9px] font-mono text-muted-foreground">{f.group ?? "fields"}</span>
+                  </button>
+                ))}
+                {annotated.filter(matches).length > 0 && (
+                  <div className="px-3 py-1 mt-1 text-[9px] font-mono tracking-widest text-muted-foreground uppercase border-t border-border">Replace existing</div>
+                )}
+                {annotated.filter(matches).map((f) => (
+                  <button
+                    key={`a-${f.name}`}
+                    onClick={() => pick(f.name)}
+                    className="w-full text-left px-3 py-1.5 hover:bg-amber/10 flex items-center gap-2 transition"
+                  >
+                    <span className="size-2.5 rounded-full bg-success shrink-0" />
+                    <span className="text-[11px] font-mono truncate">{f.name}</span>
+                    <span className="ml-auto text-[9px] font-mono text-muted-foreground truncate max-w-[80px]">{String(f.value)}</span>
+                  </button>
+                ))}
+                {allFields.filter(matches).length === 0 && (
+                  <div className="text-center text-[10px] font-mono text-muted-foreground py-6">No attributes match.</div>
+                )}
+              </div>
+              <div className="px-3 py-1.5 border-t border-border text-[9px] font-mono text-muted-foreground bg-surface/40">
+                Pick an attribute to annotate the selected text · Esc to cancel
+              </div>
+            </div>
+          </>
+        );
+      })()}
+
+
 
 
       {/* ============ Audit trail drawer ============ */}

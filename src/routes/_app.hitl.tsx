@@ -522,8 +522,31 @@ function ValidationScreen({
                             className={`group cursor-pointer rounded-lg border border-l-2 ${ring} bg-card hover:bg-surface-elevated/40 transition p-2.5 ${isSelected ? "ring-2 ring-cyan/60 shadow-md" : ""}`}
                           >
                             <div className="flex items-center justify-between gap-1">
-                              <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase truncate flex items-center gap-1">
-                                {isSelected && <CircleDot className="size-2.5 text-cyan" />}
+                              <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase truncate flex items-center gap-1.5">
+                                {(() => {
+                                  const annotated = !!(f.value && String(f.value).trim());
+                                  const isManual = !!manualAnnot[cKey];
+                                  const title = !annotated
+                                    ? "Not annotated · right-click value on source to annotate"
+                                    : isManual
+                                      ? "Manually annotated · click to locate on source"
+                                      : "Auto-annotated · click to locate on source";
+                                  return (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); if (annotated) handleSelectField(f.name); }}
+                                      title={title}
+                                      className={`grid place-items-center size-3.5 rounded-full border transition shrink-0 ${
+                                        annotated
+                                          ? "bg-success border-success shadow-[0_0_0_2px_rgba(34,197,94,0.18)] hover:scale-110"
+                                          : "bg-transparent border-muted-foreground/40 hover:border-muted-foreground"
+                                      } ${isSelected ? "ring-2 ring-cyan/60" : ""}`}
+                                    >
+                                      {annotated
+                                        ? <span className="size-1.5 rounded-full bg-white" />
+                                        : <Circle className="size-2 text-muted-foreground/50" />}
+                                    </button>
+                                  );
+                                })()}
                                 {f.name}
                               </div>
                               <span className={`text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded border ${chipTone}`}>{f.confidence}%</span>

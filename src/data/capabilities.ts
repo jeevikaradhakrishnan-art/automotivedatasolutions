@@ -1,4 +1,11 @@
-import { Car, MapPin, FileSpreadsheet, BadgeDollarSign, Cog, Search, type LucideIcon } from "lucide-react";
+import { Car, MapPin, BadgeDollarSign, Cog, Search, Bike, type LucideIcon } from "lucide-react";
+
+import imgFleetPolygon from "@/assets/case-fleet-polygon.jpg";
+import imgDealerVerification from "@/assets/case-dealer-verification.jpg";
+import imgAutoFitment from "@/assets/case-auto-fitment.jpg";
+import imgIncentivesRebates from "@/assets/case-incentives-rebates.jpg";
+import imgRentalPricing from "@/assets/case-rental-pricing.jpg";
+import imgBikeTrends from "@/assets/case-bike-trends.jpg";
 
 export interface CapabilityMetric {
   value: string;
@@ -9,17 +16,19 @@ export interface CapabilityMetric {
 export interface CapabilityCase {
   id: string;
   title: string;
-  customerProfile: string;          // anonymized
+  customerProfile: string;
+  industryTag?: string;
   oneLiner: string;
   icon: LucideIcon;
-  accent: string;                    // tailwind gradient classes
+  accent: string;
+  image: string;
   problem: string;
-  solution: string[];                // bullet points
+  solution: string[];
   metrics: CapabilityMetric[];
   approach: { phase: string; detail: string }[];
   outputColumns: string[];
   sampleRows: Record<string, string | number>[];
-  sourceUrl?: string;                // reference case study (not shown to user as customer name)
+  sourceUrl?: string;
   placeholder?: boolean;
 }
 
@@ -28,9 +37,11 @@ export const CAPABILITIES: CapabilityCase[] = [
     id: "fleet-polygon",
     title: "Polygon Location Data for Fleet Management",
     customerProfile: "Top-3 global OEM · Mobility services division",
+    industryTag: "Mobility · Fleet Ops",
     oneLiner: "Hyper-accurate polygon boundaries for ride-share and fleet ops across 200+ urban zones.",
     icon: MapPin,
     accent: "from-cyan/30 to-primary/10",
+    image: imgFleetPolygon,
     problem:
       "The customer's fleet management platform required precise polygon definitions for service zones, no-go areas, airport pickup boundaries and city operating regions across hundreds of cities. Public sources were inconsistent, often shifted boundaries year-over-year, and lacked the granularity needed for real-time driver routing and pricing.",
     solution: [
@@ -64,11 +75,13 @@ export const CAPABILITIES: CapabilityCase[] = [
   },
   {
     id: "dealer-verification",
-    title: "Independent Dealer Verification (Live)",
+    title: "Independent Dealer Verification",
     customerProfile: "Leading US automotive marketplace · listing-quality team",
+    industryTag: "Automotive Marketplace",
     oneLiner: "Continuous verification of independent dealer rooftops — phone, address, hours, brand, listing legitimacy.",
     icon: Search,
     accent: "from-amber/30 to-cyan/10",
+    image: imgDealerVerification,
     problem:
       "Independent dealers churn far more than franchise rooftops. The customer's marketplace surfaced thousands of independent dealer listings whose addresses, phones, operating hours and brand affiliations went stale within weeks — eroding consumer trust and increasing support load.",
     solution: [
@@ -99,50 +112,54 @@ export const CAPABILITIES: CapabilityCase[] = [
     ],
   },
   {
-    id: "residual-pdf-excel",
-    title: "PDF → Excel Residual Value Extraction",
-    customerProfile: "Leading US automotive marketplace · valuations team",
-    oneLiner: "Convert hundreds of monthly residual-value PDFs from finance providers into structured Excel models.",
-    icon: FileSpreadsheet,
-    accent: "from-success/30 to-primary/10",
+    id: "incentives-rebates",
+    title: "OEM Incentives & Rebates Extraction",
+    customerProfile: "Leading US automotive research & shopping marketplace",
+    industryTag: "Automotive Research · Consumer Marketplace",
+    oneLiner: "Zip-code level extraction of manufacturer incentives, rebates and special offers across every major OEM site.",
+    icon: BadgeDollarSign,
+    accent: "from-success/30 to-cyan/10",
+    image: imgIncentivesRebates,
     problem:
-      "The customer's valuations team received residual value tables from multiple finance and leasing providers as PDF documents — different layouts every month, mixed page orientations, sub-tables, footnotes, term/mileage matrices. Manual transcription consumed 80+ analyst hours per month with high error rates.",
+      "The customer's consumer-facing offer surface required current OEM incentive and rebate data — APR specials, cash-back, lease deals, conquest and loyalty offers — at the zip-code level across every major manufacturer. OEM sites change layouts frequently, gate offers behind interactive zip-code inputs, and update programs mid-month, making manual collection slow and error-prone.",
     solution: [
-      "Auto-classified incoming PDFs by provider / publication date / model year",
-      "Layout-aware extraction (table boundary detection + footnote/qualifier capture)",
-      "Mapped raw extracted cells onto the customer's canonical residual schema (MY / Trim / Term / Miles → %)",
-      "HITL gate on every PDF before Excel emission; downstream model auto-recalculated",
+      "Scrape Incentives & Rebate information from OEM websites by passing the zip codes provided by the customer",
+      "Per-OEM crawler specs reviewed and signed off by the customer before production",
+      "Sample-output validation gate before every full crawl is launched",
+      "Internal PEG QA pass on every batch before delivery in the customer's required format",
     ],
     metrics: [
-      { value: "240+",  label: "PDFs / month" },
-      { value: "97.8%", label: "Cell-level accuracy" },
-      { value: "80→4",  label: "Analyst hours saved" },
-      { value: "<10min",label: "PDF → Excel turnaround" },
+      { value: "30+",    label: "OEM brands covered" },
+      { value: "41k",    label: "US zip codes / cycle" },
+      { value: "98.4%",  label: "Field-level accuracy" },
+      { value: "Daily",  label: "Refresh cadence" },
     ],
     approach: [
-      { phase: "Ingest",    detail: "Provider-keyed inbox + S3 drop folder picks up new PDFs" },
-      { phase: "Classify",  detail: "Identify provider, publication month, model year scope" },
-      { phase: "Extract",   detail: "Table-aware extraction; footnotes attached to cells they qualify" },
-      { phase: "Map",       detail: "Onto customer's residual schema: MY × Trim × Term × Miles → %" },
-      { phase: "Review",    detail: "Every PDF reviewed in HITL before Excel publish" },
-      { phase: "Deliver",   detail: "Versioned XLSX dropped to the team's SharePoint + change log" },
+      { phase: "Input",          detail: "Customer sends manufacturers + zip codes as the cycle input" },
+      { phase: "Manual Crawl",   detail: "New OEM: manual crawl for a few zips/models to map site complexity" },
+      { phase: "Spec & Approve", detail: "Crawler spec + sample output file prepared and approved by client" },
+      { phase: "Script & Run",   detail: "Build script, generate sample output, manual check, then full crawl" },
+      { phase: "PEG QA",         detail: "Internal QC across Year / Make / Model / Zip / Offer fields" },
+      { phase: "Deliver",        detail: "Output delivered in the client's required format on the agreed cadence" },
     ],
-    outputColumns: ["Provider", "MY", "Model", "Trim", "Term (mo)", "Miles", "Residual %"],
+    outputColumns: ["Year", "Make", "Model", "Zipcode", "Offer Type", "Offer", "Offer Value", "Offer Ends On"],
     sampleRows: [
-      { Provider: "Provider A", MY: 2026, Model: "Sedan X",  Trim: "SE",   "Term (mo)": 36, Miles: 12000, "Residual %": "58.2%" },
-      { Provider: "Provider A", MY: 2026, Model: "Sedan X",  Trim: "SE",   "Term (mo)": 36, Miles: 15000, "Residual %": "55.9%" },
-      { Provider: "Provider B", MY: 2026, Model: "SUV Y",    Trim: "XLE",  "Term (mo)": 39, Miles: 12000, "Residual %": "61.4%" },
-      { Provider: "Provider B", MY: 2026, Model: "SUV Y",    Trim: "XLE",  "Term (mo)": 48, Miles: 15000, "Residual %": "52.7%" },
-      { Provider: "Provider C", MY: 2026, Model: "Truck Z",  Trim: "King", "Term (mo)": 36, Miles: 12000, "Residual %": "67.1%" },
+      { Year: 2026, Make: "Toyota",    Model: "RAV4 Hybrid", Zipcode: "90210", "Offer Type": "APR",       Offer: "1.9% APR for 60 mo",         "Offer Value": "1.9%",   "Offer Ends On": "2026-06-30" },
+      { Year: 2026, Make: "Ford",      Model: "F-150",       Zipcode: "10001", "Offer Type": "Cash Back", Offer: "$2,500 Customer Cash",       "Offer Value": "$2,500", "Offer Ends On": "2026-06-30" },
+      { Year: 2026, Make: "Honda",     Model: "Civic",       Zipcode: "60601", "Offer Type": "Lease",     Offer: "$259/mo · 36 mo · $2,599 due","Offer Value": "$259",  "Offer Ends On": "2026-07-07" },
+      { Year: 2026, Make: "Chevrolet", Model: "Silverado",   Zipcode: "33101", "Offer Type": "Conquest",  Offer: "$1,000 Competitive Bonus",   "Offer Value": "$1,000", "Offer Ends On": "2026-06-30" },
+      { Year: 2026, Make: "Hyundai",   Model: "Tucson",      Zipcode: "98101", "Offer Type": "Loyalty",   Offer: "$500 Loyalty Cash",          "Offer Value": "$500",   "Offer Ends On": "2026-07-31" },
     ],
   },
   {
     id: "rental-pricing",
     title: "Competitor Rental Pricing Intelligence",
     customerProfile: "Top US car-rental + car-share operator",
+    industryTag: "Car Rental · Car-Share",
     oneLiner: "Daily competitor rate intelligence across rental and car-share categories with corridor-level pricing recommendations.",
     icon: BadgeDollarSign,
     accent: "from-amber/40 to-danger/10",
+    image: imgRentalPricing,
     problem:
       "The customer needed daily visibility into competitor rental rates across 40+ metros, multiple pickup windows, length-of-rental and vehicle class — with the ability to feed a pricing optimizer. Manual rate-shopping took 3 FTEs and lagged the market by 48–72 hours.",
     solution: [
@@ -176,77 +193,84 @@ export const CAPABILITIES: CapabilityCase[] = [
   },
   {
     id: "auto-fitment",
-    title: "Auto Fitment Data",
-    customerProfile: "Global automotive parts marketplace",
-    oneLiner: "Year-Make-Model-Engine-Trim fitment graphs across millions of parts SKUs.",
+    title: "Auto Fitment Service",
+    customerProfile: "Global online marketplace · automotive parts category",
+    industryTag: "Parts Marketplace · Motorcycles & Cars",
+    oneLiner: "Mapping seller SKUs to the marketplace's master vehicle list — full Year-Make-Model-Submodel-Engine fitment rows per SKU.",
     icon: Cog,
     accent: "from-primary/30 to-cyan/10",
+    image: imgAutoFitment,
     problem:
-      "Parts marketplaces need to tell a shopper exactly which parts fit their exact vehicle (Year / Make / Model / Engine / Trim / Drive). Source fitment data is scattered across manufacturer catalogs, ACES/PIES feeds, and aftermarket suppliers in inconsistent shapes.",
+      "Marketplace sellers list ~100,000+ auto-parts SKUs without structured fitment data, so shoppers can't reliably search by their vehicle. The customer needed every SKU mapped against the marketplace's Master Vehicle List (MVL) — across motorcycles, cars and trucks for the US region — with consistent, machine-readable fitment rows per SKU.",
     solution: [
-      "Built ingest pipelines for ACES/PIES + manufacturer catalog feeds",
-      "Built a canonical YMME graph and mapped every SKU's fitment range onto it",
-      "Captured installation notes, position (front/rear, left/right) and quantity needed",
-      "Continuous diff against vehicle taxonomy updates (new MY launches, mid-cycle refreshes)",
+      "Ingest seller-supplied SKU data: ePID, Product Title, MPN / OEM Number, Product Page URL, Seller eBay Page Link",
+      "Map each SKU to the marketplace MVL and generate full fitment rows per applicable vehicle",
+      "Motorcycle output schema: ePID, Make, Model, Model_Submodel, Submodel, Year, Vehicle Type, Motorcycle Type",
+      "Car/Truck output schema covering Aspiration, Body, Cylinder, Drive Type, Engine (Block / CC / CID / Cylinders / Liter Display), Fuel Type, KBB_MODEL, Make, Model, NumDoors, Parts Model, Submodel, Trim, Year, Region",
+      "Deliver output in Excel using the template mutually agreed with the customer",
     ],
     metrics: [
-      { value: "8.2M",  label: "SKUs with fitment" },
-      { value: "62k",   label: "YMME variants" },
-      { value: "99.1%", label: "Fitment precision" },
-      { value: "Weekly",label: "Refresh cadence" },
+      { value: "100k+", label: "Seller SKUs / batch" },
+      { value: "50",    label: "Fitment rows / SKU (base)" },
+      { value: "23",    label: "Car/Truck output fields" },
+      { value: "8",     label: "Motorcycle output fields" },
     ],
     approach: [
-      { phase: "Ingest",    detail: "Pull ACES/PIES + manufacturer feeds + aftermarket suppliers" },
-      { phase: "Canonicalize", detail: "Map onto a unified YMMET (Year/Make/Model/Engine/Trim) graph" },
-      { phase: "Enrich",    detail: "Install notes, position, quantity, OEM cross-references" },
-      { phase: "Deliver",   detail: "Push to marketplace catalog system + edge-cached lookup API" },
+      { phase: "Input",       detail: "Receive seller SKUs with ePID, Title, MPN/OEM, Product URL, Seller URL" },
+      { phase: "Identify",    detail: "Resolve each part to OEM cross-reference + applicable vehicle scope" },
+      { phase: "MVL Map",     detail: "Map every applicable vehicle into the marketplace's Master Vehicle List" },
+      { phase: "Generate",    detail: "Emit one fitment row per (SKU × YMME variant) up to and beyond 50 rows" },
+      { phase: "QC",          detail: "Internal QA on sampled SKUs before delivery" },
+      { phase: "Deliver",     detail: "Excel in the mutually agreed template, on a weekly / bi-weekly / monthly cadence" },
     ],
-    outputColumns: ["SKU", "Part", "Year", "Make", "Model", "Engine", "Position"],
+    outputColumns: ["ePID", "Make", "Model", "Submodel", "Year", "Engine - Liter_Display", "Drive Type", "Body", "Region"],
     sampleRows: [
-      { SKU: "BR-PD-44219", Part: "Brake Pads",     Year: 2024, Make: "Honda",  Model: "Civic",   Engine: "2.0L L4", Position: "Front" },
-      { SKU: "AF-71204",    Part: "Air Filter",     Year: 2023, Make: "Toyota", Model: "RAV4",    Engine: "2.5L L4", Position: "Engine" },
-      { SKU: "SP-30182",    Part: "Spark Plug",     Year: 2025, Make: "Ford",   Model: "F-150",   Engine: "5.0L V8", Position: "Engine" },
-      { SKU: "SH-18829",    Part: "Strut Assembly", Year: 2022, Make: "Subaru", Model: "Outback", Engine: "2.5L H4", Position: "Front Left" },
-      { SKU: "OF-29914",    Part: "Oil Filter",     Year: 2024, Make: "BMW",    Model: "330i",    Engine: "2.0L L4", Position: "Engine" },
+      { ePID: "10042118", Make: "Honda",     Model: "Civic",      Submodel: "EX",    Year: 2024, "Engine - Liter_Display": "2.0L L4", "Drive Type": "FWD", Body: "Sedan",   Region: "US" },
+      { ePID: "10042118", Make: "Honda",     Model: "Civic",      Submodel: "Sport", Year: 2024, "Engine - Liter_Display": "1.5L L4", "Drive Type": "FWD", Body: "Sedan",   Region: "US" },
+      { ePID: "10058921", Make: "Toyota",    Model: "RAV4",       Submodel: "XLE",   Year: 2023, "Engine - Liter_Display": "2.5L L4", "Drive Type": "AWD", Body: "SUV",     Region: "US" },
+      { ePID: "10058921", Make: "Toyota",    Model: "RAV4 Hybrid",Submodel: "XSE",   Year: 2024, "Engine - Liter_Display": "2.5L L4", "Drive Type": "AWD", Body: "SUV",     Region: "US" },
+      { ePID: "20071804", Make: "Harley-Davidson", Model: "Street Glide", Submodel: "Special", Year: 2023, "Engine - Liter_Display": "1.9L V2", "Drive Type": "RWD", Body: "Touring", Region: "US" },
     ],
-    placeholder: true,
   },
   {
     id: "components-market-research",
-    title: "Components Market Research",
-    customerProfile: "Global drivetrain & components manufacturer",
-    oneLiner: "Continuous market research across competitor product launches, pricing, distribution and sentiment.",
-    icon: Car,
+    title: "Bicycle Industry Trend & Sentiment Monitoring",
+    customerProfile: "Global cycling components manufacturer · UK strategy team",
+    industryTag: "Cycling Components · Consumer Insights",
+    oneLiner: "Continuous insight on upcoming and current trends in the bicycle industry — preferences, geo sales signals, competitor activity and social sentiment.",
+    icon: Bike,
     accent: "from-cyan/40 to-success/10",
+    image: imgBikeTrends,
     problem:
-      "The customer's strategy team needed continuous research across competitor product launches, pricing changes, distribution shifts and end-user sentiment across cycling, marine and other component categories. Existing market research was point-in-time and out of date within a quarter.",
+      "The customer's strategy team needed a repeatable process for generating insights on upcoming and current trends in the bicycle industry, plus sources for customer preferences, sales-by-geography signals and competitor activity. Existing research was point-in-time and out of date within a quarter — and lacked any structured social-listening layer for hashtags like #gravelbike, #gravelgrinder and #cyclocross.",
     solution: [
-      "Continuous monitoring across competitor sites + retailer catalogs + review sites",
-      "Launch-detection feed + price-change alerts + sentiment shifts",
-      "Quarterly competitive battlecards auto-generated from the live feed",
-      "Strategic insights routed to product + brand teams",
+      "Identified primary social platforms for UK cycling chatter — Facebook, Twitter/X, Instagram, YouTube, Vimeo, Pinterest, Tumblr, Reddit, Bloglovin, Google+",
+      "Built hashtag-driven monitoring across #gravelbike, #gravelgrinder, #gravelrace, #cyclocross, refined by geography and date",
+      "Used a combination of native search, advanced Google operators and 3rd-party aggregation tools (Socialmention, Hashtracking) for activity, reach and sentiment",
+      "Quarterly competitive battlecards auto-generated from the live feed and routed to product + brand teams",
     ],
     metrics: [
-      { value: "18",     label: "Competitor brands" },
-      { value: "Daily",  label: "Refresh cadence" },
-      { value: "1,200+", label: "Retailers monitored" },
-      { value: "12",     label: "Battlecards / quarter" },
+      { value: "10",    label: "Social platforms monitored" },
+      { value: "Daily", label: "Refresh cadence" },
+      { value: "4",     label: "Core hashtag clusters" },
+      { value: "40k",   label: "Avg. monthly reach / hashtag" },
     ],
     approach: [
-      { phase: "Monitor",  detail: "Competitor sites + retailer catalogs + review sites" },
-      { phase: "Detect",   detail: "New launches, price moves, distribution shifts, sentiment swings" },
-      { phase: "Analyze",  detail: "Auto-generated battlecards + strategic insight digests" },
-      { phase: "Deliver",  detail: "Pushed to product + brand teams weekly + on-event" },
+      { phase: "Scope",     detail: "Define trend questions: preferences, geo, competitor, sentiment" },
+      { phase: "Sources",   detail: "Map the UK social stack: FB, Twitter, IG, YT, Vimeo, Pinterest, Tumblr, Reddit, Bloglovin, G+" },
+      { phase: "Hashtags",  detail: "Track #gravelbike, #gravelgrinder, #gravelrace, #cyclocross by geo + date" },
+      { phase: "Aggregate", detail: "Combine native search + advanced Google + Socialmention + Hashtracking" },
+      { phase: "Sentiment", detail: "Score positive / neutral / negative + extract top keywords and influencers" },
+      { phase: "Deliver",   detail: "Quarterly battlecards + on-event alerts to product + brand teams" },
     ],
-    outputColumns: ["Competitor", "Category", "SKU", "List Price", "Δ 30d", "Sentiment"],
+    outputColumns: ["Platform", "Hashtag", "Geography", "Mentions (30d)", "Reach", "Sentiment", "Top Influencer"],
     sampleRows: [
-      { Competitor: "Brand A", Category: "Drivetrain", SKU: "DT-7200-S", "List Price": "$489", "Δ 30d": "+3.1%", Sentiment: "+0.42" },
-      { Competitor: "Brand B", Category: "Drivetrain", SKU: "DT-6100-X", "List Price": "$329", "Δ 30d": "+0.0%", Sentiment: "+0.18" },
-      { Competitor: "Brand C", Category: "Brakes",     SKU: "BR-204-DH", "List Price": "$224", "Δ 30d": "-2.4%", Sentiment: "+0.11" },
-      { Competitor: "Brand A", Category: "Brakes",     SKU: "BR-505-M",  "List Price": "$268", "Δ 30d": "+1.5%", Sentiment: "+0.38" },
-      { Competitor: "Brand D", Category: "Shifters",   SKU: "SH-9100",   "List Price": "$182", "Δ 30d": "-0.8%", Sentiment: "-0.05" },
+      { Platform: "Twitter/X",  Hashtag: "#gravelbike",    Geography: "United Kingdom", "Mentions (30d)": 62,    Reach: "40,000",  Sentiment: "+0.18", "Top Influencer": "@gravelbikecom" },
+      { Platform: "Instagram",  Hashtag: "#gravelgrinder", Geography: "United Kingdom", "Mentions (30d)": 1480,  Reach: "212,000", Sentiment: "+0.34", "Top Influencer": "@immediatebikes" },
+      { Platform: "Facebook",   Hashtag: "#cyclocross",    Geography: "United Kingdom", "Mentions (30d)": 942,   Reach: "188,400", Sentiment: "+0.21", "Top Influencer": "British Cycling" },
+      { Platform: "YouTube",    Hashtag: "#gravelrace",    Geography: "United Kingdom", "Mentions (30d)": 84,    Reach: "96,200",  Sentiment: "+0.42", "Top Influencer": "GCN" },
+      { Platform: "Reddit",     Hashtag: "#gravelbike",    Geography: "United Kingdom", "Mentions (30d)": 311,   Reach: "54,800",  Sentiment: "+0.11", "Top Influencer": "r/cycling" },
     ],
-    placeholder: true,
   },
 ];
 

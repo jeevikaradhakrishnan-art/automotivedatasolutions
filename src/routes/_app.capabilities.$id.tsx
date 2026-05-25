@@ -386,9 +386,9 @@ function PictorialFlow({
           {steps.map((step, i) => {
             const node = flow[i] ?? FALLBACK_FLOW[i % FALLBACK_FLOW.length];
             const StepIcon = node.icon;
-            const offset = i % 2 === 0 ? "lg:-translate-y-6" : "lg:translate-y-6";
             return (
-              <li key={i} className={`group relative flex flex-col items-center text-center ${offset}`}>
+              <li key={i} className="group relative flex flex-col items-center text-center">
+
                 {/* Chapter marker */}
                 <div className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground/70 mb-2">
                   CH · {ROMAN[i] ?? i + 1}

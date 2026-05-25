@@ -1228,73 +1228,120 @@ function VehicleSpecSheetPdf({ f, item }: { f: Record<string, string>; item: Hit
   const oem = f.oem || "Mercedes-Benz";
   const model = f.model || item.recordName?.split(" ")[0] || "EQE";
   const trim = f.trim || "350 4MATIC";
+  const brandColor = oem.toLowerCase().includes("ford") ? "#003478"
+    : oem.toLowerCase().includes("bmw") ? "#1c69d4"
+    : oem.toLowerCase().includes("audi") ? "#bb0a30"
+    : oem.toLowerCase().includes("maruti") || oem.toLowerCase().includes("suzuki") ? "#e60012"
+    : "#111";
+
   return (
-    <div className="bg-white text-neutral-900 shadow-xl mx-auto max-w-[640px] aspect-[1/1.414] p-8 flex flex-col text-[11px]">
-      <div className="flex items-start justify-between border-b-2 border-black pb-3">
-        <div>
-          <div className="text-[9px] tracking-[0.3em] text-neutral-500">PRODUCT DATA SHEET</div>
-          <div className="text-2xl font-light mt-1">{oem}</div>
-          <div className="text-base font-semibold">{model} <span className="font-light">{trim}</span></div>
+    <div className="bg-white text-neutral-900 shadow-2xl mx-auto max-w-[640px] aspect-[1/1.414] flex flex-col text-[11px] border border-neutral-300 relative overflow-hidden">
+      {/* Brochure cover band */}
+      <div className="relative h-[34%] text-white p-6 flex flex-col" style={{ background: `linear-gradient(135deg, ${brandColor}, #111)` }}>
+        <div className="flex items-center justify-between">
+          <div className="text-[9px] tracking-[0.35em] opacity-80">{oem.toUpperCase()} · PRODUCT BROCHURE</div>
+          <div className="text-[9px] tracking-[0.2em] opacity-80">MY{new Date().getFullYear()}</div>
         </div>
-        <div className="text-right text-[9px] text-neutral-500">
-          <div>Ref. {item.recordName?.replace(/\s+/g, "-").toUpperCase()}</div>
-          <div>Effective {new Date().getFullYear()}</div>
-          <div>Doc rev. 03</div>
+        <div className="mt-auto">
+          <div className="text-5xl font-light leading-none">{model}</div>
+          <div className="text-base mt-1 opacity-90">{trim}</div>
+          <div className="text-[10px] mt-2 opacity-70 italic">Engineered for the way you drive.</div>
         </div>
+        {/* car silhouette */}
+        <svg viewBox="0 0 400 90" className="absolute right-4 bottom-3 w-[55%] opacity-60">
+          <path d="M20 65 Q60 25 150 25 L230 25 Q290 25 330 55 L380 60 Q390 60 390 70 L20 70 Z" fill="#fff" />
+          <circle cx="115" cy="70" r="13" fill="#000" /><circle cx="115" cy="70" r="6" fill="#999" />
+          <circle cx="305" cy="70" r="13" fill="#000" /><circle cx="305" cy="70" r="6" fill="#999" />
+          <rect x="155" y="33" width="80" height="14" rx="3" fill="rgba(255,255,255,0.6)" />
+        </svg>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-x-6">
-        <div>
-          <SectionTitle>POWERTRAIN</SectionTitle>
-          <PdfRow k="Drivetrain" v={f.drivetrain || "AWD"} />
-          <PdfRow k="Battery capacity" v={`${f.battery_kwh || "—"} kWh`} />
-          <PdfRow k="Range (EPA est.)" v={`${f.range_mi || "—"} mi`} />
-          <PdfRow k="0–60 mph" v={`${f.zero_to_sixty_s || "—"} s`} />
-          <PdfRow k="Peak power" v="288 kW (385 hp)" />
-          <PdfRow k="Peak torque" v="565 lb-ft" />
-
-          <SectionTitle>CHARGING</SectionTitle>
-          <PdfRow k="DC fast charge" v="170 kW (10–80% in 32 min)" />
-          <PdfRow k="AC onboard" v="11 kW" />
-          <PdfRow k="Connector" v="CCS Combo 1 (NACS adapter)" />
+      {/* Spec body */}
+      <div className="flex-1 p-6 flex flex-col">
+        <div className="flex items-baseline justify-between border-b-2 pb-2" style={{ borderColor: brandColor }}>
+          <div className="text-[10px] tracking-[0.25em] font-bold" style={{ color: brandColor }}>TECHNICAL SPECIFICATIONS</div>
+          <div className="text-[9px] text-neutral-500">Ref. {item.recordName?.replace(/\s+/g, "-").toUpperCase()} · Rev. 03</div>
         </div>
-        <div>
-          <SectionTitle>DIMENSIONS</SectionTitle>
-          <PdfRow k="Length" v={`${f.length_in || "—"} in`} />
-          <PdfRow k="Wheelbase" v={`${f.wheelbase_in || "—"} in`} />
-          <PdfRow k="Width (w/ mirrors)" v="83.1 in" />
-          <PdfRow k="Height" v="59.6 in" />
-          <PdfRow k="Curb weight" v="5,597 lb" />
-          <PdfRow k="Cargo (rear seats up)" v="15.0 cu ft" />
 
-          <SectionTitle>PRICING</SectionTitle>
-          <PdfRow k="MSRP" v={f.msrp || "—"} />
-          <PdfRow k="Destination & delivery" v="$1,150" />
-          <PdfRow k="Available equipment" v="See option list, p. 2" />
+        <div className="mt-3 grid grid-cols-2 gap-x-6 flex-1">
+          <div>
+            <SectionTitle>POWERTRAIN</SectionTitle>
+            <PdfRow k="Drivetrain" v={f.drivetrain || "AWD"} />
+            <PdfRow k="Battery capacity" v={`${f.battery_kwh || "—"} kWh`} />
+            <PdfRow k="Range (EPA est.)" v={`${f.range_mi || "—"} mi`} />
+            <PdfRow k="0–60 mph" v={`${f.zero_to_sixty_s || "—"} s`} />
+            <PdfRow k="Peak power" v="288 kW (385 hp)" />
+            <PdfRow k="Peak torque" v="565 lb-ft" />
+
+            <SectionTitle>CHARGING</SectionTitle>
+            <PdfRow k="DC fast charge" v="170 kW (10–80% / 32 min)" />
+            <PdfRow k="AC onboard" v="11 kW" />
+            <PdfRow k="Connector" v="CCS Combo 1" />
+          </div>
+          <div>
+            <SectionTitle>DIMENSIONS</SectionTitle>
+            <PdfRow k="Length" v={`${f.length_in || "—"} in`} />
+            <PdfRow k="Wheelbase" v={`${f.wheelbase_in || "—"} in`} />
+            <PdfRow k="Width (w/ mirrors)" v="83.1 in" />
+            <PdfRow k="Height" v="59.6 in" />
+            <PdfRow k="Curb weight" v="5,597 lb" />
+            <PdfRow k="Cargo (rear seats up)" v="15.0 cu ft" />
+
+            <SectionTitle>PRICING</SectionTitle>
+            <PdfRow k="MSRP" v={f.msrp || "—"} />
+            <PdfRow k="Destination & delivery" v="$1,150" />
+            <PdfRow k="As shown" v={f.msrp || "—"} />
+          </div>
         </div>
-      </div>
 
-      <div className="mt-5">
-        <SectionTitle>STANDARD EQUIPMENT (SELECTED)</SectionTitle>
-        <div className="grid grid-cols-2 text-[10.5px] gap-x-6">
-          <ul className="list-disc pl-4 space-y-0.5 text-neutral-800">
-            <li>MBUX hyperscreen · 56" curved glass</li>
-            <li>Driver Assistance Package</li>
-            <li>Burmester® 3D surround sound</li>
-            <li>Heated/ventilated front seats</li>
-          </ul>
-          <ul className="list-disc pl-4 space-y-0.5 text-neutral-800">
-            <li>Air balance package · 4-zone climate</li>
-            <li>Panoramic roof</li>
-            <li>Wireless Apple CarPlay / Android Auto</li>
-            <li>360° camera with surround view</li>
-          </ul>
+        {/* Color swatches strip — brochure style */}
+        <div className="mt-3 pt-3 border-t border-neutral-200">
+          <div className="text-[9px] tracking-[0.25em] font-bold text-neutral-700 mb-2">AVAILABLE EXTERIOR COLORS</div>
+          <div className="flex gap-2 items-center">
+            {[
+              ["#0a0a0a", "Jet Black"],
+              ["#e5e7eb", "Glacier White"],
+              ["#7a8a99", "Storm Grey"],
+              ["#6b1d1d", "Sangria Red"],
+              ["#1c3a5e", "Midnight Blue"],
+              ["#8a7a4a", "Desert Bronze"],
+            ].map(([c, n]) => (
+              <div key={n} className="flex flex-col items-center gap-1">
+                <div className="w-7 h-7 rounded-full border border-neutral-300 shadow-sm" style={{ background: c }} />
+                <span className="text-[8px] text-neutral-500">{n}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="mt-auto pt-4 border-t text-[9px] text-neutral-500 flex justify-between">
-        <span>© {new Date().getFullYear()} {oem} USA, LLC. Specifications subject to change without notice.</span>
-        <span>Page 1 of 1</span>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="rounded p-2.5 text-[10px]" style={{ background: `${brandColor}10`, border: `1px solid ${brandColor}40` }}>
+            <div className="font-bold mb-1" style={{ color: brandColor }}>STANDARD EQUIPMENT</div>
+            <ul className="list-disc pl-4 space-y-0.5 text-neutral-700">
+              <li>Driver Assistance Package</li>
+              <li>Premium audio · 14 speakers</li>
+              <li>Heated/ventilated front seats</li>
+              <li>Wireless Apple CarPlay / Android Auto</li>
+            </ul>
+          </div>
+          <div className="rounded p-2.5 text-[10px]" style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}>
+            <div className="font-bold mb-1 text-neutral-800">SAFETY · NHTSA</div>
+            <div className="flex items-center gap-1 mt-1">
+              {[1,2,3,4,5].map((s) => (<span key={s} style={{ color: "#f5a623" }}>★</span>))}
+              <span className="ml-1 text-neutral-500">Overall</span>
+            </div>
+            <ul className="list-disc pl-4 mt-1 space-y-0.5 text-neutral-700">
+              <li>Auto emergency braking</li>
+              <li>Blind-spot · rear cross-traffic</li>
+              <li>Lane-keep assist · adaptive cruise</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="mt-auto pt-3 border-t text-[8.5px] text-neutral-500 flex justify-between">
+          <span>© {new Date().getFullYear()} {oem}. Specifications subject to change without notice. EPA estimates pending final certification.</span>
+          <span className="font-mono">Page 1 / 2</span>
+        </div>
       </div>
     </div>
   );

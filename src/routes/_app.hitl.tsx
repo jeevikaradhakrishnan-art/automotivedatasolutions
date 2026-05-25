@@ -241,7 +241,12 @@ function ValidationScreen({
   const item = items[idx];
   const allFields = useMemo(() => {
     const base = (item.fields ?? []).map((f) => ({ ...f, value: edits[`${item.id}:${f.name}`] ?? f.value }));
-    const extras = extraFields.map((e) => ({ name: e.name, value: e.value, group: e.group, confidence: 100 }));
+    const extras = extraFields.map((e) => ({
+      name: e.name,
+      value: edits[`${item.id}:${e.name}`] ?? e.value,
+      group: e.group,
+      confidence: 100,
+    }));
     return [...base, ...extras];
   }, [item, edits, extraFields]);
 
@@ -323,7 +328,19 @@ function ValidationScreen({
 
   const handleEdit = (fname: string, val: string) => {
     setEdits((e) => ({ ...e, [`${item.id}:${fname}`]: val }));
+    // Also reflect change directly in extraFields so custom attributes update immediately
+    setExtraFields((arr) => arr.some((x) => x.name === fname) ? arr.map((x) => x.name === fname ? { ...x, value: val } : x) : arr);
   };
+
+  const sourceUrl = (() => {
+    switch (job.solutionId) {
+      case "vehicle-spec": return "https://www.bmw.in/en/configurator.html";
+      case "news": return "https://www.reuters.com/business/autos-transportation/";
+      case "ev-charging": return "https://www.chargepoint.com/charge-locator";
+      case "dealer-inventory": return "https://www.audi.in/en/models/a4/a4-sedan/configurator/";
+      default: return "https://www.tesla.com/en_IN/modely/design";
+    }
+  })();
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-surface/40 via-background to-surface/20 relative">
@@ -396,7 +413,17 @@ function ValidationScreen({
             <button onClick={() => setLanguage((l) => l === "original" ? "translated" : "original")} className={`h-7 px-2 rounded-md text-[10px] font-mono border flex items-center gap-1 transition ${language === "translated" ? "border-cyan/40 bg-cyan/10 text-cyan" : "border-border hover:border-cyan/30"}`}>
               <Languages className="size-3" /> {language === "original" ? "EN" : "↔ EN"}
             </button>
+            <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="h-7 px-2 rounded-md text-[10px] font-mono border border-border hover:border-cyan/40 hover:bg-cyan/5 flex items-center gap-1 transition" title={sourceUrl}>
+              <Globe className="size-3" /> SOURCE ↗
+            </a>
             <span className="ml-auto text-[10px] font-mono text-muted-foreground truncate max-w-[160px]">{item.recordName}.{view}</span>
+          </div>
+
+          {/* Compact legend bar (inline, doesn't overlap source) */}
+          <div className="px-3 py-1.5 border-b border-border bg-card/40 flex items-center gap-2 text-[9px] font-mono flex-wrap">
+            <span className="px-1.5 py-0.5 rounded bg-success/15 border border-success/40 text-success">● SELECTED</span>
+            <span className="px-1.5 py-0.5 rounded bg-amber/15 border border-amber/40 text-amber">● AUTO-EXTRACTED</span>
+            <span className="px-1.5 py-0.5 rounded bg-card border border-border text-muted-foreground flex items-center gap-1"><MousePointerClick className="size-2.5" /> RIGHT-CLICK ANY TEXT TO MANUALLY ANNOTATE</span>
           </div>
 
           <div
@@ -411,11 +438,6 @@ function ValidationScreen({
               setCtxMenu({ x: e.clientX, y: e.clientY, text });
             }}
           >
-            <div className="absolute top-3 right-6 z-10 flex flex-col gap-1 text-[9px] font-mono">
-              <span className="px-1.5 py-0.5 rounded bg-success/15 border border-success/40 text-success backdrop-blur">● SELECTED</span>
-              <span className="px-1.5 py-0.5 rounded bg-amber/15 border border-amber/40 text-amber backdrop-blur">● AUTO-EXTRACTED</span>
-              <span className="px-1.5 py-0.5 rounded bg-card/80 border border-border text-muted-foreground backdrop-blur flex items-center gap-1"><MousePointerClick className="size-2.5" /> RIGHT-CLICK TO ANNOTATE</span>
-            </div>
             <div style={{ zoom: `${zoom}%` }} className="transition-all">
               <SourceWithHighlights
                 solutionId={job.solutionId}

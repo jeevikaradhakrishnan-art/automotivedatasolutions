@@ -332,15 +332,8 @@ function ValidationScreen({
     setExtraFields((arr) => arr.some((x) => x.name === fname) ? arr.map((x) => x.name === fname ? { ...x, value: val } : x) : arr);
   };
 
-  const sourceUrl = (() => {
-    switch (job.solutionId) {
-      case "vehicle-spec": return "https://www.bmw.in/en/configurator.html";
-      case "news": return "https://www.reuters.com/business/autos-transportation/";
-      case "ev-charging": return "https://www.chargepoint.com/charge-locator";
-      case "dealer-inventory": return "https://www.audi.in/en/models/a4/a4-sedan/configurator/";
-      default: return "https://www.tesla.com/en_IN/modely/design";
-    }
-  })();
+  // View is locked to the source's native format (news=HTML, OEM/spec=HTML or PDF per record)
+  void setView;
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-surface/40 via-background to-surface/20 relative">

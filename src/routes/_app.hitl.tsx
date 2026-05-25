@@ -376,24 +376,23 @@ function ValidationScreen({
         {/* ============ LHS ============ */}
         <div className="border-r border-border bg-surface/20 flex flex-col min-h-0">
           <div className="px-3 py-2 border-b border-border flex items-center gap-1.5 bg-card/60 backdrop-blur flex-wrap">
-            <div className="flex items-center rounded-md border border-border overflow-hidden">
-              <button onClick={() => setView("html")} className={`h-7 px-2 text-[10px] font-mono flex items-center gap-1 transition ${view === "html" ? "bg-cyan/10 text-cyan" : "text-muted-foreground hover:bg-surface-elevated"}`}>
-                <Globe className="size-3" /> HTML
-              </button>
-              <button onClick={() => setView("pdf")} className={`h-7 px-2 text-[10px] font-mono flex items-center gap-1 transition ${view === "pdf" ? "bg-amber/10 text-amber" : "text-muted-foreground hover:bg-surface-elevated"}`}>
-                <FileText className="size-3" /> PDF
-              </button>
+            <div className="flex items-center rounded-md border border-border px-2 h-7 text-[10px] font-mono">
+              {view === "pdf"
+                ? <span className="text-amber flex items-center gap-1"><FileText className="size-3" /> PDF</span>
+                : <span className="text-cyan flex items-center gap-1"><Globe className="size-3" /> HTML</span>}
             </div>
             <div className="flex items-center rounded-md border border-border">
               <button onClick={() => setZoom((z) => Math.max(60, z - 10))} className="h-7 w-7 grid place-items-center hover:bg-surface-elevated transition"><ZoomOut className="size-3" /></button>
               <span className="text-[10px] font-mono px-1 tabular-nums w-10 text-center">{zoom}%</span>
               <button onClick={() => setZoom((z) => Math.min(160, z + 10))} className="h-7 w-7 grid place-items-center hover:bg-surface-elevated transition"><ZoomIn className="size-3" /></button>
             </div>
-            <div className="flex items-center rounded-md border border-border">
-              <button disabled className="h-7 w-7 grid place-items-center opacity-40"><ChevronLeft className="size-3" /></button>
-              <span className="text-[10px] font-mono px-1">P 1/1</span>
-              <button disabled className="h-7 w-7 grid place-items-center opacity-40"><ChevronRight className="size-3" /></button>
-            </div>
+            {view === "pdf" && (
+              <div className="flex items-center rounded-md border border-border">
+                <button disabled className="h-7 w-7 grid place-items-center opacity-40"><ChevronLeft className="size-3" /></button>
+                <span className="text-[10px] font-mono px-1">P 1/1</span>
+                <button disabled className="h-7 w-7 grid place-items-center opacity-40"><ChevronRight className="size-3" /></button>
+              </div>
+            )}
             <div className="relative flex-1 min-w-[140px] max-w-[200px]">
               <Search className="size-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -406,11 +405,9 @@ function ValidationScreen({
             <button onClick={() => setLanguage((l) => l === "original" ? "translated" : "original")} className={`h-7 px-2 rounded-md text-[10px] font-mono border flex items-center gap-1 transition ${language === "translated" ? "border-cyan/40 bg-cyan/10 text-cyan" : "border-border hover:border-cyan/30"}`}>
               <Languages className="size-3" /> {language === "original" ? "EN" : "↔ EN"}
             </button>
-            <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="h-7 px-2 rounded-md text-[10px] font-mono border border-border hover:border-cyan/40 hover:bg-cyan/5 flex items-center gap-1 transition" title={sourceUrl}>
-              <Globe className="size-3" /> SOURCE ↗
-            </a>
             <span className="ml-auto text-[10px] font-mono text-muted-foreground truncate max-w-[160px]">{item.recordName}.{view}</span>
           </div>
+
 
           {/* Compact legend bar (inline, doesn't overlap source) */}
           <div className="px-3 py-1.5 border-b border-border bg-card/40 flex items-center gap-2 text-[9px] font-mono flex-wrap">

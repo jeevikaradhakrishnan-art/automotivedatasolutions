@@ -1008,7 +1008,7 @@ function SolutionReviewQueue({ solutionId }: { solutionId: string }) {
 type BatchRow = { jobId: string; source?: string; workflow?: string; startedAt?: string; pending: number; approved: number; rejected: number; total: number };
 
 function useMemoBatches(hitl: HitlItem[], jobs: Job[], solutionId: string): BatchRow[] {
-  return useMemoOnce(() => {
+  return useMemo(() => {
     const batches = new Map<string, BatchRow>();
     hitl.forEach((h) => {
       if (!h.jobId || h.solutionId !== solutionId) return;
@@ -1025,10 +1025,4 @@ function useMemoBatches(hitl: HitlItem[], jobs: Job[], solutionId: string): Batc
     });
     return Array.from(batches.values()).sort((a, b) => (b.startedAt ?? "").localeCompare(a.startedAt ?? ""));
   }, [hitl, jobs, solutionId]);
-}
-
-// thin wrapper to avoid importing useMemo at the top of this giant file again
-function useMemoOnce<T>(fn: () => T, deps: unknown[]): T {
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemoReact(fn, deps);
 }

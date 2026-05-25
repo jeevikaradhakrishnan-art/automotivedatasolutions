@@ -291,4 +291,190 @@ function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) 
   );
 }
 
+// ---------- Pictorial flow ----------
+
+type LucideIconType = typeof Database;
+
+type FlowNode = { icon: LucideIconType; chapter: string; tint: string };
+
+const FLOW_BY_CAPABILITY: Record<string, FlowNode[]> = {
+  "fleet-polygon": [
+    { icon: Compass,     chapter: "The Scout",     tint: "from-cyan/30 to-cyan/5" },
+    { icon: MapIcon,     chapter: "The Cartographer", tint: "from-violet-400/30 to-violet-400/5" },
+    { icon: Layers,      chapter: "The Translator", tint: "from-emerald-400/30 to-emerald-400/5" },
+    { icon: ShieldCheck, chapter: "The Inspector",  tint: "from-amber-400/30 to-amber-400/5" },
+    { icon: Send,        chapter: "The Courier",    tint: "from-rose-400/30 to-rose-400/5" },
+  ],
+  "dealer-verification": [
+    { icon: Radar,    chapter: "The Listener",  tint: "from-cyan/30 to-cyan/5" },
+    { icon: Crosshair,chapter: "The Matcher",   tint: "from-violet-400/30 to-violet-400/5" },
+    { icon: Flag,     chapter: "The Referee",   tint: "from-amber-400/30 to-amber-400/5" },
+    { icon: Webhook,  chapter: "The Broadcaster", tint: "from-emerald-400/30 to-emerald-400/5" },
+  ],
+  "incentives-rebates": [
+    { icon: FileInput,      chapter: "The Brief",      tint: "from-cyan/30 to-cyan/5" },
+    { icon: Globe,          chapter: "The Recon",      tint: "from-violet-400/30 to-violet-400/5" },
+    { icon: ClipboardCheck, chapter: "The Blueprint",  tint: "from-sky-400/30 to-sky-400/5" },
+    { icon: Bot,            chapter: "The Build",      tint: "from-emerald-400/30 to-emerald-400/5" },
+    { icon: FileCheck2,     chapter: "The Audit",      tint: "from-amber-400/30 to-amber-400/5" },
+    { icon: Mailbox,        chapter: "The Drop",       tint: "from-rose-400/30 to-rose-400/5" },
+  ],
+  "rental-pricing": [
+    { icon: ShoppingCart, chapter: "The Shopper",  tint: "from-cyan/30 to-cyan/5" },
+    { icon: Tag,          chapter: "The Decoder",  tint: "from-violet-400/30 to-violet-400/5" },
+    { icon: Gauge,        chapter: "The Index",    tint: "from-emerald-400/30 to-emerald-400/5" },
+    { icon: Bell,         chapter: "The Sentry",   tint: "from-amber-400/30 to-amber-400/5" },
+    { icon: Send,         chapter: "The Dispatch", tint: "from-rose-400/30 to-rose-400/5" },
+  ],
+  "auto-fitment": [
+    { icon: FileInput,       chapter: "The Intake",   tint: "from-cyan/30 to-cyan/5" },
+    { icon: PackageSearch,   chapter: "The Sleuth",   tint: "from-violet-400/30 to-violet-400/5" },
+    { icon: Wrench,          chapter: "The Mapper",   tint: "from-sky-400/30 to-sky-400/5" },
+    { icon: TableProperties, chapter: "The Forge",    tint: "from-emerald-400/30 to-emerald-400/5" },
+    { icon: ShieldCheck,     chapter: "The Audit",    tint: "from-amber-400/30 to-amber-400/5" },
+    { icon: Truck,           chapter: "The Hand-off", tint: "from-rose-400/30 to-rose-400/5" },
+  ],
+  "components-market-research": [
+    { icon: Crosshair,    chapter: "The Question",  tint: "from-cyan/30 to-cyan/5" },
+    { icon: Globe,        chapter: "The Field",     tint: "from-violet-400/30 to-violet-400/5" },
+    { icon: Hash,         chapter: "The Signals",   tint: "from-sky-400/30 to-sky-400/5" },
+    { icon: Filter,       chapter: "The Distill",   tint: "from-emerald-400/30 to-emerald-400/5" },
+    { icon: Smile,        chapter: "The Mood",      tint: "from-amber-400/30 to-amber-400/5" },
+    { icon: Rss,          chapter: "The Briefing",  tint: "from-rose-400/30 to-rose-400/5" },
+  ],
+};
+
+const FALLBACK_FLOW: FlowNode[] = [
+  { icon: Database,    chapter: "The Source",   tint: "from-cyan/30 to-cyan/5" },
+  { icon: Search0Icon, chapter: "The Search",   tint: "from-violet-400/30 to-violet-400/5" },
+  { icon: Cpu,         chapter: "The Engine",   tint: "from-sky-400/30 to-sky-400/5" },
+  { icon: ShieldCheck, chapter: "The Gate",     tint: "from-emerald-400/30 to-emerald-400/5" },
+  { icon: LineChart,   chapter: "The Insight",  tint: "from-amber-400/30 to-amber-400/5" },
+  { icon: Send,        chapter: "The Delivery", tint: "from-rose-400/30 to-rose-400/5" },
+];
+
+const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
+
+function PictorialFlow({
+  capabilityId,
+  steps,
+}: {
+  capabilityId: string;
+  steps: { phase: string; detail: string }[];
+}) {
+  const flow = FLOW_BY_CAPABILITY[capabilityId] ?? FALLBACK_FLOW;
+
+  return (
+    <div className="relative rounded-2xl border border-border bg-gradient-to-br from-surface/60 via-background to-surface-elevated/40 p-6 md:p-10 overflow-hidden">
+      {/* Atmospheric bg */}
+      <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none" />
+      <div className="absolute -top-20 left-1/3 w-72 h-72 rounded-full bg-cyan/10 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-24 right-10 w-72 h-72 rounded-full bg-violet-500/10 blur-3xl pointer-events-none" />
+
+      {/* DESKTOP — horizontal zigzag flow */}
+      <div className="relative hidden lg:block">
+        {/* Curved path connector */}
+        <svg
+          className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full h-32 pointer-events-none"
+          viewBox="0 0 1000 120"
+          preserveAspectRatio="none"
+          aria-hidden
+        >
+          <defs>
+            <linearGradient id="flow-grad" x1="0" x2="1">
+              <stop offset="0%"   stopColor="hsl(var(--cyan-raw, 190 95% 55%))" stopOpacity="0.0" />
+              <stop offset="15%"  stopColor="currentColor" stopOpacity="0.7" />
+              <stop offset="85%"  stopColor="currentColor" stopOpacity="0.7" />
+              <stop offset="100%" stopColor="currentColor" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M 20 60 Q 150 0 280 60 T 540 60 T 800 60 T 980 60"
+            fill="none"
+            stroke="url(#flow-grad)"
+            strokeWidth="1.5"
+            strokeDasharray="4 6"
+            className="text-cyan"
+          />
+        </svg>
+
+        <ol
+          className="relative grid gap-4"
+          style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
+        >
+          {steps.map((step, i) => {
+            const node = flow[i] ?? FALLBACK_FLOW[i % FALLBACK_FLOW.length];
+            const StepIcon = node.icon;
+            const offset = i % 2 === 0 ? "lg:-translate-y-6" : "lg:translate-y-6";
+            return (
+              <li key={i} className={`group relative flex flex-col items-center text-center ${offset}`}>
+                {/* Chapter marker */}
+                <div className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground/70 mb-2">
+                  CH · {ROMAN[i] ?? i + 1}
+                </div>
+
+                {/* Illustrated node */}
+                <div className="relative">
+                  <div className={`absolute inset-0 rounded-full bg-gradient-to-br ${node.tint} blur-xl scale-125 group-hover:scale-150 transition`} />
+                  <div className="relative size-20 rounded-full border border-cyan/30 bg-gradient-to-br from-surface-elevated to-surface grid place-items-center shadow-[0_8px_24px_-12px_rgba(0,255,255,0.35)] group-hover:border-cyan/60 transition">
+                    <StepIcon className="size-8 text-cyan" strokeWidth={1.5} />
+                  </div>
+                  <span className="absolute -top-1 -right-1 size-6 rounded-full bg-background border border-cyan/40 text-[10px] font-mono text-cyan grid place-items-center">
+                    {i + 1}
+                  </span>
+                </div>
+
+                {/* Chapter title — creative */}
+                <div className="mt-4 text-sm font-semibold tracking-tight italic text-foreground">
+                  {node.chapter}
+                </div>
+                {/* Actual phase */}
+                <div className="text-[11px] font-mono uppercase tracking-widest text-cyan/80 mt-0.5">
+                  {step.phase}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed max-w-[180px]">
+                  {step.detail}
+                </p>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+
+      {/* MOBILE / TABLET — vertical storyboard */}
+      <ol className="relative lg:hidden space-y-5 pl-6">
+        <div className="absolute left-[26px] top-2 bottom-2 w-px bg-gradient-to-b from-transparent via-cyan/40 to-transparent" />
+        {steps.map((step, i) => {
+          const node = flow[i] ?? FALLBACK_FLOW[i % FALLBACK_FLOW.length];
+          const StepIcon = node.icon;
+          return (
+            <li key={i} className="relative flex gap-4">
+              <div className="relative shrink-0">
+                <div className={`absolute inset-0 rounded-full bg-gradient-to-br ${node.tint} blur-md scale-125`} />
+                <div className="relative size-14 rounded-full border border-cyan/30 bg-gradient-to-br from-surface-elevated to-surface grid place-items-center">
+                  <StepIcon className="size-6 text-cyan" strokeWidth={1.5} />
+                </div>
+                <span className="absolute -top-1 -right-1 size-5 rounded-full bg-background border border-cyan/40 text-[9px] font-mono text-cyan grid place-items-center">
+                  {i + 1}
+                </span>
+              </div>
+              <div className="flex-1 pt-1">
+                <div className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground/70">
+                  CH · {ROMAN[i] ?? i + 1}
+                </div>
+                <div className="text-sm font-semibold italic">{node.chapter}</div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-cyan/80 mt-0.5">
+                  {step.phase}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                  {step.detail}
+                </p>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
 

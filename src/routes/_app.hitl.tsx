@@ -473,21 +473,22 @@ function ValidationScreen({
                   className="w-full h-7 pl-7 pr-2 rounded-md bg-input border border-border text-[11px] font-mono focus:border-cyan/40 outline-none transition"
                 />
               </div>
-              <div className="flex items-center rounded-md border border-border overflow-hidden text-[10px] font-mono">
-                {(["all", "high", "medium", "low"] as const).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setConfidenceFilter(t)}
-                    className={`h-7 px-2 transition ${
-                      confidenceFilter === t
-                        ? t === "high" ? "bg-success/15 text-success" : t === "medium" ? "bg-amber/15 text-amber" : t === "low" ? "bg-danger/15 text-danger" : "bg-cyan/15 text-cyan"
-                        : "text-muted-foreground hover:bg-surface-elevated"
-                    }`}
-                  >
-                    {t === "all" ? "ALL" : t === "high" ? `H·${dist.h}` : t === "medium" ? `M·${dist.m}` : `L·${dist.l}`}
-                  </button>
-                ))}
-              </div>
+              <select
+                value={confidenceFilter}
+                onChange={(e) => setConfidenceFilter(e.target.value as "all" | "high" | "medium" | "low")}
+                title="Filter by confidence"
+                className={`h-7 px-2 rounded-md border text-[10px] font-mono font-semibold cursor-pointer outline-none focus:ring-2 focus:ring-cyan/40 transition ${
+                  confidenceFilter === "high"   ? "bg-success/15 border-success/40 text-success" :
+                  confidenceFilter === "medium" ? "bg-amber/15 border-amber/40 text-amber" :
+                  confidenceFilter === "low"    ? "bg-danger/15 border-danger/40 text-danger" :
+                                                  "bg-cyan/10 border-cyan/30 text-cyan"
+                }`}
+              >
+                <option value="all">● ALL · {allFields.length}</option>
+                <option value="high">● HIGH CONFIDENCE · {dist.h}</option>
+                <option value="medium">● MEDIUM CONFIDENCE · {dist.m}</option>
+                <option value="low">● LOW CONFIDENCE · {dist.l}</option>
+              </select>
             </div>
           </div>
 
@@ -553,21 +554,7 @@ function ValidationScreen({
                                 })()}
                                 {f.name}
                               </div>
-                              <select
-                                value={tier}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => {
-                                  const v = e.target.value as "high" | "medium" | "low";
-                                  setConfOverride((c) => ({ ...c, [cKeyTier]: v }));
-                                  pushAudit(`Confidence set to ${v.toUpperCase()} · ${f.name}`, v === "high" ? "success" : v === "medium" ? "amber" : "danger");
-                                }}
-                                title="Set confidence tier"
-                                className={`text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded border cursor-pointer outline-none focus:ring-2 focus:ring-cyan/40 ${chipTone}`}
-                              >
-                                <option value="high">● HIGH</option>
-                                <option value="medium">● MEDIUM</option>
-                                <option value="low">● LOW</option>
-                              </select>
+                              <span className={`text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded border ${chipTone}`}>{f.confidence}%</span>
                             </div>
                             <input
                               value={f.value}

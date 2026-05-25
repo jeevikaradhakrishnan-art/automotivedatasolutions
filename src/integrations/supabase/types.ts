@@ -14,7 +14,111 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admin_activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json
+          id: string
+          solution_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json
+          id?: string
+          solution_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json
+          id?: string
+          solution_id?: string | null
+        }
+        Relationships: []
+      }
+      solution_datasets: {
+        Row: {
+          columns: Json | null
+          file_name: string
+          file_size: number | null
+          id: string
+          is_active: boolean
+          mime_type: string | null
+          preview: Json | null
+          row_count: number | null
+          solution_id: string
+          storage_path: string
+          uploaded_at: string
+        }
+        Insert: {
+          columns?: Json | null
+          file_name: string
+          file_size?: number | null
+          id?: string
+          is_active?: boolean
+          mime_type?: string | null
+          preview?: Json | null
+          row_count?: number | null
+          solution_id: string
+          storage_path: string
+          uploaded_at?: string
+        }
+        Update: {
+          columns?: Json | null
+          file_name?: string
+          file_size?: number | null
+          id?: string
+          is_active?: boolean
+          mime_type?: string | null
+          preview?: Json | null
+          row_count?: number | null
+          solution_id?: string
+          storage_path?: string
+          uploaded_at?: string
+        }
+        Relationships: []
+      }
+      solution_overrides: {
+        Row: {
+          created_at: string
+          description: string | null
+          download_assets: Json
+          enabled: boolean
+          metrics: Json
+          sample_datasets: Json
+          solution_id: string
+          tags: string[]
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          download_assets?: Json
+          enabled?: boolean
+          metrics?: Json
+          sample_datasets?: Json
+          solution_id: string
+          tags?: string[]
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          download_assets?: Json
+          enabled?: boolean
+          metrics?: Json
+          sample_datasets?: Json
+          solution_id?: string
+          tags?: string[]
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

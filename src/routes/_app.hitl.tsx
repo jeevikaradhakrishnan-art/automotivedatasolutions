@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   Check, X, ClipboardCheck, Filter, FileText, Globe,
   ChevronLeft, ChevronRight, Info, Search, SkipForward, ArrowRight, Layers, Lock,
+  ZoomIn, ZoomOut, Languages, Plus, MessageSquare, Sparkles, Keyboard, History,
+  Activity, Gauge, ChevronDown, Edit3, MapPin, Save, Send, CircleDot,
 } from "lucide-react";
 import { usePlatform, type HitlItem, type HitlStatus, type Job } from "@/store/platform";
 import { SOLUTIONS, getSolution } from "@/data/solutions";

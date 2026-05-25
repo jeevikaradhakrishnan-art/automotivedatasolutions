@@ -198,7 +198,7 @@ const seedHitl = (): HitlItem[] => {
     detail: `New trim discovered on Ford configurator. Verify MSRP and powertrain mapping against customer template.`,
     field: "trim/msrp", proposed: m.trim, current: "—",
     fields: VEHICLE_FIELDS("Ford", m.model, m.trim, m.msrp),
-    confidence: 78 - i * 3, status: "pending", createdAt: new Date(TS_18M_AGO + i * 1000).toISOString(), previewKind: "pdf",
+    confidence: 78 - i * 3, status: "pending", createdAt: new Date(TS_18M_AGO + i * 1000).toISOString(), previewKind: i % 2 === 0 ? "pdf" : "html",
   }));
   // Vehicle BMW batch (3 records)
   const bmwModels = [

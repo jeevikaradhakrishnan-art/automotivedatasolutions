@@ -7,20 +7,29 @@ import {
 import { usePlatform, type HitlItem, type HitlStatus, type Job } from "@/store/platform";
 import { SOLUTIONS, getSolution } from "@/data/solutions";
 
-export const Route = createFileRoute("/_app/hitl")({ component: HitlPage });
+type HitlSearch = { sol?: string; job?: string };
+
+export const Route = createFileRoute("/_app/hitl")({
+  validateSearch: (s: Record<string, unknown>): HitlSearch => ({
+    sol: typeof s.sol === "string" ? s.sol : undefined,
+    job: typeof s.job === "string" ? s.job : undefined,
+  }),
+  component: HitlPage,
+});
 
 
 
 function HitlPage() {
+  const search = Route.useSearch();
   const hitl = usePlatform((s) => s.hitl);
   const jobs = usePlatform((s) => s.jobs);
   const resolve = usePlatform((s) => s.resolveHitl);
   const completeReview = usePlatform((s) => s.completeJobReview);
   const addFeedback = usePlatform((s) => s.addFeedback);
 
-  const [solFilter, setSolFilter] = useState<string>("all");
+  const [solFilter, setSolFilter] = useState<string>(search.sol ?? "all");
   const [formatFilter, setFormatFilter] = useState<"all" | "html" | "pdf">("all");
-  const [openJobId, setOpenJobId] = useState<string | null>(null);
+  const [openJobId, setOpenJobId] = useState<string | null>(search.job ?? null);
 
   // Build batches grouped by jobId (review-stage jobs only)
   const batches = useMemo(() => {

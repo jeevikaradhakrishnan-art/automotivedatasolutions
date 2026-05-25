@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ArrowLeft, Check, Plus, FileDown, Sparkles, Database, Workflow, Inbox,
   Play, Globe, Settings2, Boxes, GitBranch, Send, ListChecks,
@@ -17,7 +17,7 @@ import { InsightDetailModal } from "@/components/solutions/InsightDetailModal";
 
 export const Route = createFileRoute("/_app/solutions/$id")({ component: SolutionDetail });
 
-type Tab = "sources" | "workflows" | "jobs" | "data" | "integrations" | "insights";
+type Tab = "sources" | "workflows" | "jobs" | "review" | "data" | "integrations" | "insights";
 
 function SolutionDetail() {
   const { id } = Route.useParams();
@@ -133,13 +133,15 @@ function SolutionDetail() {
     else downloadFile(`${base}.csv`, toCSV(cols, rows), "text/csv");
   };
 
+  const pendingReview = allJobs.filter((j) => j.solutionId === solution.id && j.status === "review").length;
   const tabs: { id: Tab; label: string; icon: typeof Inbox; show: boolean; badge?: number }[] = [
-    { id: "sources",      label: "Sources",      icon: Globe,     show: true, badge: solution.sources.length },
-    { id: "workflows",    label: "Workflows",    icon: Workflow,  show: true, badge: workflows.length },
-    { id: "jobs",         label: "Jobs",         icon: Inbox,     show: true, badge: jobs.length },
-    { id: "data",         label: "Data",         icon: Database,  show: true },
-    { id: "integrations", label: "Integrations", icon: Send,      show: true },
-    { id: "insights",     label: "Insights",     icon: Sparkles,  show: solution.hasInsights },
+    { id: "sources",      label: "Sources",      icon: Globe,         show: true, badge: solution.sources.length },
+    { id: "workflows",    label: "Workflows",    icon: Workflow,      show: true, badge: workflows.length },
+    { id: "jobs",         label: "Jobs",         icon: Inbox,         show: true, badge: jobs.length },
+    { id: "review",       label: "Review · HITL", icon: ListChecks,   show: true, badge: pendingReview || undefined },
+    { id: "data",         label: "Data",         icon: Database,      show: true },
+    { id: "integrations", label: "Integrations", icon: Send,          show: true },
+    { id: "insights",     label: "Insights",     icon: Sparkles,      show: solution.hasInsights },
   ];
 
 
@@ -225,10 +227,11 @@ function SolutionDetail() {
       )}
 
       {tab === "jobs" && (
-        <div className="space-y-4">
-          <SolutionReviewQueue solutionId={solution.id} />
-          <JobsTable jobs={jobs} onDownload={handleDownload} onSelect={setOpenJob} />
-        </div>
+        <JobsTable jobs={jobs} onDownload={handleDownload} onSelect={setOpenJob} />
+      )}
+
+      {tab === "review" && (
+        <SolutionReviewQueue solutionId={solution.id} />
       )}
 
       {tab === "data" && <DataTab solutionId={solution.id} columns={solution.sampleColumns} sampleRows={solution.sampleRows} approvedJobs={jobs.filter((j) => j.status === "success")} />}
@@ -914,57 +917,112 @@ function Meta({ label, value }: { label: string; value: string }) {
 }
 
 function SolutionReviewQueue({ solutionId }: { solutionId: string }) {
-  const hitl = usePlatform((s) => s.hitl.filter((h) => h.solutionId === solutionId));
+  const hitlAll = usePlatform((s) => s.hitl);
   const jobsAll = usePlatform((s) => s.jobs);
-  const batches = new Map<string, { jobId: string; source?: string; workflow?: string; pending: number; approved: number; rejected: number; total: number }>();
-  hitl.forEach((h) => {
-    if (!h.jobId) return;
-    const j = jobsAll.find((x) => x.id === h.jobId);
-    const cur = batches.get(h.jobId) ?? { jobId: h.jobId, source: j?.source, workflow: h.workflow ?? j?.workflow, pending: 0, approved: 0, rejected: 0, total: 0 };
-    cur.total += 1;
-    if (h.status === "pending") cur.pending += 1;
-    if (h.status === "approved") cur.approved += 1;
-    if (h.status === "rejected") cur.rejected += 1;
-    batches.set(h.jobId, cur);
-  });
-  const list = Array.from(batches.values());
-  if (list.length === 0) return null;
 
-  const totalPending = list.reduce((n, b) => n + b.pending, 0);
+  const batches = useMemoBatches(hitlAll, jobsAll, solutionId);
+
+  if (batches.length === 0) {
+    return (
+      <div className="border border-dashed border-border rounded-md py-10 text-center text-xs text-muted-foreground">
+        No records awaiting review for this use case. Run a workflow to populate the queue.
+      </div>
+    );
+  }
+
+  const totalPending = batches.reduce((n, b) => n + b.pending, 0);
+  const totalApproved = batches.reduce((n, b) => n + b.approved, 0);
+  const totalRejected = batches.reduce((n, b) => n + b.rejected, 0);
 
   return (
-    <div className="panel p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="size-7 rounded-md bg-amber/15 border border-amber/30 grid place-items-center">
-            <ListChecks className="size-3.5 text-amber" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold">Review queue · HITL</div>
-            <div className="text-[11px] text-muted-foreground">{totalPending} record{totalPending === 1 ? "" : "s"} awaiting human verification</div>
-          </div>
-        </div>
-        <Link to="/hitl" className="text-[11px] font-mono text-primary hover:underline">OPEN FULL QUEUE →</Link>
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-[11px] font-mono">
+        <span className="px-2 py-1 rounded border border-amber/30 text-amber bg-amber/5">⏳ {totalPending} PENDING</span>
+        <span className="px-2 py-1 rounded border border-success/30 text-success bg-success/5">✓ {totalApproved} APPROVED</span>
+        <span className="px-2 py-1 rounded border border-danger/30 text-danger bg-danger/5">✕ {totalRejected} REJECTED</span>
+        <Link to="/hitl" search={{ sol: solutionId }} className="ml-auto text-[11px] font-mono text-primary hover:underline">
+          OPEN FULL HITL QUEUE →
+        </Link>
       </div>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-        {list.map((b) => (
-          <Link key={b.jobId} to="/hitl" className="rounded-md border border-border p-3 hover:border-primary/40 hover:bg-surface-elevated/40 transition group">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono text-muted-foreground truncate">{b.workflow ?? b.source}</span>
-              <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${b.pending > 0 ? "border-amber/40 text-amber bg-amber/10" : "border-success/40 text-success bg-success/10"}`}>
-                {b.pending > 0 ? `${b.pending} PENDING` : "COMPLETE"}
-              </span>
-            </div>
-            <div className="text-xs mt-1 truncate">{b.source}</div>
-            <div className="text-[10px] font-mono text-muted-foreground mt-2 flex gap-2">
-              <span className="text-success">✓{b.approved}</span>
-              <span className="text-danger">✕{b.rejected}</span>
-              <span className="text-amber">⏳{b.pending}</span>
-              <span className="ml-auto text-primary opacity-0 group-hover:opacity-100">REVIEW →</span>
-            </div>
-          </Link>
-        ))}
+
+      <div className="border border-border rounded-md overflow-hidden">
+        <table className="w-full text-xs">
+          <thead className="bg-surface-elevated/60">
+            <tr className="text-left font-mono text-[10px] tracking-wider text-muted-foreground uppercase">
+              <th className="px-3 py-2">Job</th>
+              <th className="px-3 py-2">Workflow · Source</th>
+              <th className="px-3 py-2 text-right">Records</th>
+              <th className="px-3 py-2">Progress</th>
+              <th className="px-3 py-2">Queued</th>
+              <th className="px-3 py-2 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {batches.map((b) => {
+              const progress = b.total ? Math.round(((b.approved + b.rejected) / b.total) * 100) : 0;
+              return (
+                <tr key={b.jobId} className="border-t border-border hover:bg-surface-elevated/40">
+                  <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">{b.jobId.slice(0, 8)}</td>
+                  <td className="px-3 py-2">
+                    <div className="truncate max-w-[260px]">{b.workflow ?? "—"}</div>
+                    <div className="text-[10px] font-mono text-muted-foreground truncate max-w-[260px]">{b.source}</div>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <div className="text-sm font-semibold">{b.total}</div>
+                    <div className="text-[10px] font-mono text-muted-foreground">
+                      <span className="text-success">✓{b.approved}</span> · <span className="text-danger">✕{b.rejected}</span> · <span className="text-amber">⏳{b.pending}</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 min-w-[120px]">
+                    <div className="h-1.5 rounded bg-surface-elevated overflow-hidden">
+                      <div className="h-full bg-cyan" style={{ width: `${progress}%` }} />
+                    </div>
+                    <div className="text-[10px] font-mono text-muted-foreground mt-1">{progress}%</div>
+                  </td>
+                  <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                    {b.startedAt ? new Date(b.startedAt).toLocaleTimeString() : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <Link
+                      to="/hitl"
+                      search={{ sol: solutionId, job: b.jobId }}
+                      className={`inline-flex items-center gap-1 h-7 px-2.5 rounded text-[11px] font-mono border transition ${
+                        b.pending > 0
+                          ? "border-amber/40 text-amber bg-amber/5 hover:bg-amber/10"
+                          : "border-border text-muted-foreground hover:border-cyan/30 hover:text-cyan"
+                      }`}
+                    >
+                      {b.pending > 0 ? "REVIEW" : "OPEN"} →
+                    </Link>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
+}
+
+type BatchRow = { jobId: string; source?: string; workflow?: string; startedAt?: string; pending: number; approved: number; rejected: number; total: number };
+
+function useMemoBatches(hitl: HitlItem[], jobs: Job[], solutionId: string): BatchRow[] {
+  return useMemo(() => {
+    const batches = new Map<string, BatchRow>();
+    hitl.forEach((h) => {
+      if (!h.jobId || h.solutionId !== solutionId) return;
+      const j = jobs.find((x) => x.id === h.jobId);
+      const cur = batches.get(h.jobId) ?? {
+        jobId: h.jobId, source: j?.source, workflow: h.workflow ?? j?.workflow, startedAt: j?.startedAt,
+        pending: 0, approved: 0, rejected: 0, total: 0,
+      };
+      cur.total += 1;
+      if (h.status === "pending") cur.pending += 1;
+      if (h.status === "approved") cur.approved += 1;
+      if (h.status === "rejected") cur.rejected += 1;
+      batches.set(h.jobId, cur);
+    });
+    return Array.from(batches.values()).sort((a, b) => (b.startedAt ?? "").localeCompare(a.startedAt ?? ""));
+  }, [hitl, jobs, solutionId]);
 }

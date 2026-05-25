@@ -553,21 +553,7 @@ function ValidationScreen({
                                 })()}
                                 {f.name}
                               </div>
-                              <select
-                                value={tier}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => {
-                                  const v = e.target.value as "high" | "medium" | "low";
-                                  setConfOverride((c) => ({ ...c, [cKeyTier]: v }));
-                                  pushAudit(`Confidence set to ${v.toUpperCase()} · ${f.name}`, v === "high" ? "success" : v === "medium" ? "amber" : "danger");
-                                }}
-                                title="Set confidence tier"
-                                className={`text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded border cursor-pointer outline-none focus:ring-2 focus:ring-cyan/40 ${chipTone}`}
-                              >
-                                <option value="high">● HIGH</option>
-                                <option value="medium">● MEDIUM</option>
-                                <option value="low">● LOW</option>
-                              </select>
+                              <span className={`text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded border ${chipTone}`}>{f.confidence}%</span>
                             </div>
                             <input
                               value={f.value}

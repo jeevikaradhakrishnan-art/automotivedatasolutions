@@ -328,7 +328,19 @@ function ValidationScreen({
 
   const handleEdit = (fname: string, val: string) => {
     setEdits((e) => ({ ...e, [`${item.id}:${fname}`]: val }));
+    // Also reflect change directly in extraFields so custom attributes update immediately
+    setExtraFields((arr) => arr.some((x) => x.name === fname) ? arr.map((x) => x.name === fname ? { ...x, value: val } : x) : arr);
   };
+
+  const sourceUrl = (() => {
+    switch (job.solutionId) {
+      case "vehicle-spec": return "https://www.bmw.in/en/configurator.html";
+      case "news": return "https://www.reuters.com/business/autos-transportation/";
+      case "ev-charging": return "https://www.chargepoint.com/charge-locator";
+      case "dealer-inventory": return "https://www.audi.in/en/models/a4/a4-sedan/configurator/";
+      default: return "https://www.tesla.com/en_IN/modely/design";
+    }
+  })();
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-surface/40 via-background to-surface/20 relative">

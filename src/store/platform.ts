@@ -213,7 +213,7 @@ const seedHitl = (): HitlItem[] => {
     detail: `Confidence below threshold on battery_kwh field — verify before shipping to customer template.`,
     field: "battery_kwh", proposed: "82 kWh", current: "—",
     fields: VEHICLE_FIELDS("BMW", m.model, m.trim, m.msrp),
-    confidence: 74 - i * 4, status: "pending", createdAt: new Date(TS_18M_AGO + 5000 + i * 1000).toISOString(), previewKind: "html",
+    confidence: 74 - i * 4, status: "pending", createdAt: new Date(TS_18M_AGO + 5000 + i * 1000).toISOString(), previewKind: i === 1 ? "pdf" : "html",
   }));
   // News batch (3 articles)
   ["BYD secures lithium supply deal in Atacama", "Toyota patent splits V2G / V2X classification", "GM Cruise restarts limited autonomy pilot"].forEach((h, i) => items.push({

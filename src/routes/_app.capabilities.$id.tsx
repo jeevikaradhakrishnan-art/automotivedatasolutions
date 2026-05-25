@@ -209,42 +209,10 @@ function CapabilityDetail() {
           </div>
         </section>
 
-        {/* APPROACH WORKFLOW */}
+        {/* APPROACH WORKFLOW — pictorial flow */}
         <section>
-          <SectionHeading eyebrow="HOW IT WORKS" title="End-to-end approach" />
-          <div className="relative">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-              {c.approach.map((p, i) => {
-                const StepIcons = [Database, Search0Icon, Cpu, ShieldCheck, LineChart, ArrowRight];
-                const StepIcon = StepIcons[i % StepIcons.length];
-                return (
-                  <div key={i} className="relative">
-                    <div className="group relative h-full rounded-xl border border-border bg-gradient-to-br from-surface to-surface-elevated p-4 hover:border-cyan/40 transition overflow-hidden">
-                      <div className="absolute -top-8 -right-8 size-24 rounded-full bg-cyan/5 blur-xl group-hover:bg-cyan/15 transition" />
-                      <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="size-9 rounded-lg bg-cyan/10 border border-cyan/30 grid place-items-center">
-                            <StepIcon className="size-4 text-cyan" />
-                          </div>
-                          <span className="text-[10px] font-mono text-muted-foreground">
-                            STEP {String(i + 1).padStart(2, "0")}
-                          </span>
-                        </div>
-                        <div className="text-sm font-semibold">{p.phase}</div>
-                        <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{p.detail}</p>
-                      </div>
-                    </div>
-                    {/* Connector */}
-                    {i < c.approach.length - 1 && (
-                      <div className="hidden xl:block absolute top-1/2 -right-2 translate-x-full -translate-y-1/2 text-cyan/40 pointer-events-none">
-                        <ArrowRight className="size-4" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <SectionHeading eyebrow="THE JOURNEY" title="From signal to deliverable" />
+          <PictorialFlow capabilityId={c.id} steps={c.approach} />
         </section>
 
         {/* SAMPLE DATA + DOWNLOAD */}

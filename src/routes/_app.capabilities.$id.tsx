@@ -373,30 +373,11 @@ function PictorialFlow({
 
       {/* DESKTOP — horizontal zigzag flow */}
       <div className="relative hidden lg:block">
-        {/* Curved path connector */}
-        <svg
-          className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full h-32 pointer-events-none"
-          viewBox="0 0 1000 120"
-          preserveAspectRatio="none"
-          aria-hidden
-        >
-          <defs>
-            <linearGradient id="flow-grad" x1="0" x2="1">
-              <stop offset="0%"   stopColor="hsl(var(--cyan-raw, 190 95% 55%))" stopOpacity="0.0" />
-              <stop offset="15%"  stopColor="currentColor" stopOpacity="0.7" />
-              <stop offset="85%"  stopColor="currentColor" stopOpacity="0.7" />
-              <stop offset="100%" stopColor="currentColor" stopOpacity="0.0" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M 20 60 Q 150 0 280 60 T 540 60 T 800 60 T 980 60"
-            fill="none"
-            stroke="url(#flow-grad)"
-            strokeWidth="1.5"
-            strokeDasharray="4 6"
-            className="text-cyan"
-          />
-        </svg>
+        {/* Straight line connector */}
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px pointer-events-none">
+          <div className="h-px w-full bg-[linear-gradient(to_right,transparent,hsl(var(--border))_8%,hsl(var(--border))_92%,transparent)]" />
+          <div className="absolute inset-0 h-px w-full bg-[repeating-linear-gradient(to_right,transparent_0,transparent_6px,rgba(34,211,238,0.55)_6px,rgba(34,211,238,0.55)_12px)] opacity-70" />
+        </div>
 
         <ol
           className="relative grid gap-4"
@@ -405,9 +386,9 @@ function PictorialFlow({
           {steps.map((step, i) => {
             const node = flow[i] ?? FALLBACK_FLOW[i % FALLBACK_FLOW.length];
             const StepIcon = node.icon;
-            const offset = i % 2 === 0 ? "lg:-translate-y-6" : "lg:translate-y-6";
             return (
-              <li key={i} className={`group relative flex flex-col items-center text-center ${offset}`}>
+              <li key={i} className="group relative flex flex-col items-center text-center">
+
                 {/* Chapter marker */}
                 <div className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground/70 mb-2">
                   CH · {ROMAN[i] ?? i + 1}

@@ -413,7 +413,17 @@ function ValidationScreen({
             <button onClick={() => setLanguage((l) => l === "original" ? "translated" : "original")} className={`h-7 px-2 rounded-md text-[10px] font-mono border flex items-center gap-1 transition ${language === "translated" ? "border-cyan/40 bg-cyan/10 text-cyan" : "border-border hover:border-cyan/30"}`}>
               <Languages className="size-3" /> {language === "original" ? "EN" : "↔ EN"}
             </button>
+            <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="h-7 px-2 rounded-md text-[10px] font-mono border border-border hover:border-cyan/40 hover:bg-cyan/5 flex items-center gap-1 transition" title={sourceUrl}>
+              <Globe className="size-3" /> SOURCE ↗
+            </a>
             <span className="ml-auto text-[10px] font-mono text-muted-foreground truncate max-w-[160px]">{item.recordName}.{view}</span>
+          </div>
+
+          {/* Compact legend bar (inline, doesn't overlap source) */}
+          <div className="px-3 py-1.5 border-b border-border bg-card/40 flex items-center gap-2 text-[9px] font-mono flex-wrap">
+            <span className="px-1.5 py-0.5 rounded bg-success/15 border border-success/40 text-success">● SELECTED</span>
+            <span className="px-1.5 py-0.5 rounded bg-amber/15 border border-amber/40 text-amber">● AUTO-EXTRACTED</span>
+            <span className="px-1.5 py-0.5 rounded bg-card border border-border text-muted-foreground flex items-center gap-1"><MousePointerClick className="size-2.5" /> RIGHT-CLICK ANY TEXT TO MANUALLY ANNOTATE</span>
           </div>
 
           <div
@@ -428,11 +438,6 @@ function ValidationScreen({
               setCtxMenu({ x: e.clientX, y: e.clientY, text });
             }}
           >
-            <div className="absolute top-3 right-6 z-10 flex flex-col gap-1 text-[9px] font-mono">
-              <span className="px-1.5 py-0.5 rounded bg-success/15 border border-success/40 text-success backdrop-blur">● SELECTED</span>
-              <span className="px-1.5 py-0.5 rounded bg-amber/15 border border-amber/40 text-amber backdrop-blur">● AUTO-EXTRACTED</span>
-              <span className="px-1.5 py-0.5 rounded bg-card/80 border border-border text-muted-foreground backdrop-blur flex items-center gap-1"><MousePointerClick className="size-2.5" /> RIGHT-CLICK TO ANNOTATE</span>
-            </div>
             <div style={{ zoom: `${zoom}%` }} className="transition-all">
               <SourceWithHighlights
                 solutionId={job.solutionId}

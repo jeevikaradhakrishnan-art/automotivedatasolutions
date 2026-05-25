@@ -229,6 +229,9 @@ function ValidationScreen({
   const [extraFields, setExtraFields] = useState<{ name: string; value: string; group: string }[]>([]);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
+  const [manualAnnot, setManualAnnot] = useState<Record<string, true>>({});
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [ctxQuery, setCtxQuery] = useState("");
   const [auditLog, setAuditLog] = useState<{ at: string; msg: string; tone: "cyan" | "success" | "danger" | "amber" }[]>(
     () => [{ at: new Date().toISOString(), msg: `Batch opened · ${items.length} records loaded from ${job.source}`, tone: "cyan" }]
   );

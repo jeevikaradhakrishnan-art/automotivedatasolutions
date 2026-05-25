@@ -227,10 +227,11 @@ function SolutionDetail() {
       )}
 
       {tab === "jobs" && (
-        <div className="space-y-4">
-          <SolutionReviewQueue solutionId={solution.id} />
-          <JobsTable jobs={jobs} onDownload={handleDownload} onSelect={setOpenJob} />
-        </div>
+        <JobsTable jobs={jobs} onDownload={handleDownload} onSelect={setOpenJob} />
+      )}
+
+      {tab === "review" && (
+        <SolutionReviewQueue solutionId={solution.id} />
       )}
 
       {tab === "data" && <DataTab solutionId={solution.id} columns={solution.sampleColumns} sampleRows={solution.sampleRows} approvedJobs={jobs.filter((j) => j.status === "success")} />}

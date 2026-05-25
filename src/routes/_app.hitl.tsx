@@ -598,49 +598,8 @@ function ValidationScreen({
         </div>
       </div>
 
-      {/* ============ Floating confidence analytics ============ */}
-      <div className="fixed bottom-20 left-4 z-20 hidden xl:block">
-        <div className="rounded-xl border border-border bg-card/80 backdrop-blur-xl shadow-lg p-3 w-56 space-y-2">
-          <div className="flex items-center gap-1.5 text-[10px] font-mono tracking-widest text-muted-foreground">
-            <Gauge className="size-3 text-cyan" /> CONFIDENCE ANALYTICS
-          </div>
-          <div className="flex items-end gap-2">
-            <div className="text-2xl font-semibold tabular-nums">{dist.avg}<span className="text-xs text-muted-foreground">%</span></div>
-            <div className="text-[10px] font-mono text-muted-foreground pb-1">avg this record</div>
-          </div>
-          <div className="h-2 rounded-full overflow-hidden flex bg-surface-elevated">
-            <div className="bg-success" style={{ width: `${(dist.h / Math.max(1, allFields.length)) * 100}%` }} />
-            <div className="bg-amber" style={{ width: `${(dist.m / Math.max(1, allFields.length)) * 100}%` }} />
-            <div className="bg-danger" style={{ width: `${(dist.l / Math.max(1, allFields.length)) * 100}%` }} />
-          </div>
-          <div className="grid grid-cols-3 gap-1 text-[9px] font-mono">
-            <div className="text-success">● HIGH {dist.h}</div>
-            <div className="text-amber">● MED {dist.m}</div>
-            <div className="text-danger">● LOW {dist.l}</div>
-          </div>
-          <div className="h-px bg-border" />
-          <div className="text-[10px] font-mono text-muted-foreground tracking-widest">BATCH PROGRESS</div>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 h-1.5 rounded-full bg-surface-elevated overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-cyan to-success transition-all" style={{ width: `${completionPct}%` }} />
-            </div>
-            <span className="text-[10px] font-mono tabular-nums">{completionPct}%</span>
-          </div>
-          <div className="text-[9px] font-mono text-muted-foreground">
-            <span className="text-success">✓{approved}</span> · <span className="text-danger">✕{rejected}</span> · <span className="text-amber">⏳{pendingLeft}</span>
-          </div>
-          {/* mini activity timeline */}
-          <div className="h-px bg-border" />
-          <div className="text-[10px] font-mono text-muted-foreground tracking-widest">MINI TIMELINE</div>
-          <div className="flex gap-0.5 h-4 items-end">
-            {items.map((it, i) => {
-              const c = it.status === "approved" ? "bg-success" : it.status === "rejected" ? "bg-danger" : "bg-amber/40";
-              const h = it.status === "pending" ? "h-1.5" : "h-3";
-              return <div key={it.id} className={`flex-1 rounded-sm ${c} ${h} ${i === idx ? "ring-1 ring-cyan" : ""}`} title={it.recordName} />;
-            })}
-          </div>
-        </div>
-      </div>
+      {/* Floating confidence analytics removed to keep LHS unobstructed */}
+
 
       {/* ============ Audit trail drawer ============ */}
       {showAudit && (

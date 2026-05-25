@@ -27,7 +27,7 @@ interface ActivityRow { id: string; action: string; solution_id: string | null; 
 const BUCKET = "solution-assets";
 
 async function logActivity(action: string, solution_id: string | null, details: Record<string, unknown> = {}) {
-  await supabase.from("admin_activity_log").insert({ action, solution_id, details });
+  await supabase.from("admin_activity_log").insert({ action, solution_id, details: details as never });
 }
 
 function AdminConsole() {

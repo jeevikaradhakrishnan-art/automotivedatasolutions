@@ -118,11 +118,11 @@
   .text-amber { color: var(--amber); }
   .text-danger { color: var(--danger); }
   .text-success { color: var(--success); }
-  .bg-cyan\/10 { background-color: oklch(0.55 0.15 220 / 10%); }
-  .bg-amber\/10 { background-color: oklch(0.66 0.16 65 / 12%); }
-  .bg-danger\/10 { background-color: oklch(0.58 0.22 25 / 10%); }
-  .bg-success\/10 { background-color: oklch(0.58 0.14 155 / 10%); }
-  .border-cyan\/30 { border-color: oklch(0.55 0.15 220 / 30%); }
+  .bg-cyan\/10 { background-color: oklch(0.62 0.18 220 / 12%); }
+  .bg-amber\/10 { background-color: oklch(0.72 0.18 65 / 14%); }
+  .bg-danger\/10 { background-color: oklch(0.60 0.24 25 / 12%); }
+  .bg-success\/10 { background-color: oklch(0.62 0.16 160 / 12%); }
+  .border-cyan\/30 { border-color: oklch(0.56 0.20 255 / 35%); }
   .ticker {
     animation: ticker 60s linear infinite;
   }

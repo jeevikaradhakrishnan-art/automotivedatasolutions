@@ -205,94 +205,245 @@ function ValidationScreen({
   onComplete: () => void;
   onFeedback: (rating: "up" | "down", message: string) => void;
 }) {
+  void sol;
   const sol = getSolution(job.solutionId);
   const [idx, setIdx] = useState<number>(() => {
     const firstPending = items.findIndex((i) => i.status === "pending");
     return firstPending === -1 ? 0 : firstPending;
   });
-  const [confidenceFilter, setConfidenceFilter] = useState<"all" | "low">("all");
+  const [confidenceFilter, setConfidenceFilter] = useState<"all" | "high" | "medium" | "low">("all");
   const [fieldQuery, setFieldQuery] = useState("");
   const [feedback, setFeedback] = useState("");
   const [sent, setSent] = useState(false);
 
-  const item = items[idx];
-  const goNext = () => setIdx((i) => Math.min(i + 1, items.length - 1));
-  const goPrev = () => setIdx((i) => Math.max(i - 1, 0));
+  // Premium UI state
+  const [zoom, setZoom] = useState(100);
+  const [lhsSearch, setLhsSearch] = useState("");
+  const [view, setView] = useState<"html" | "pdf">(previewKind);
+  const [language, setLanguage] = useState<"original" | "translated">("original");
+  const [selectedField, setSelectedField] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [comments, setComments] = useState<Record<string, string>>({});
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [openComment, setOpenComment] = useState<string | null>(null);
+  const [extraFields, setExtraFields] = useState<{ name: string; value: string; group: string }[]>([]);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showAudit, setShowAudit] = useState(false);
+  const [auditLog, setAuditLog] = useState<{ at: string; msg: string; tone: "cyan" | "success" | "danger" | "amber" }[]>(
+    () => [{ at: new Date().toISOString(), msg: `Batch opened · ${items.length} records loaded from ${job.source}`, tone: "cyan" }]
+  );
+  const lhsRef = useRef<HTMLDivElement>(null);
 
-  const handleApprove = () => { onResolve(item.id, "approved"); if (idx < items.length - 1) goNext(); };
-  const handleReject  = () => { onResolve(item.id, "rejected"); if (idx < items.length - 1) goNext(); };
-  const handleSkip    = () => goNext();
+  const item = items[idx];
+  const allFields = useMemo(() => {
+    const base = (item.fields ?? []).map((f) => ({ ...f, value: edits[`${item.id}:${f.name}`] ?? f.value }));
+    const extras = extraFields.map((e) => ({ name: e.name, value: e.value, group: e.group, confidence: 100 }));
+    return [...base, ...extras];
+  }, [item, edits, extraFields]);
+
+  const pushAudit = useCallback((msg: string, tone: "cyan" | "success" | "danger" | "amber" = "cyan") => {
+    setAuditLog((l) => [{ at: new Date().toISOString(), msg, tone }, ...l].slice(0, 40));
+  }, []);
+
+  const goNext = useCallback(() => setIdx((i) => Math.min(i + 1, items.length - 1)), [items.length]);
+  const goPrev = useCallback(() => setIdx((i) => Math.max(i - 1, 0)), []);
+
+  const handleApprove = useCallback(() => {
+    onResolve(item.id, "approved");
+    pushAudit(`Approved · ${item.recordName}`, "success");
+    if (idx < items.length - 1) goNext();
+  }, [item, idx, items.length, onResolve, pushAudit, goNext]);
+  const handleReject = useCallback(() => {
+    onResolve(item.id, "rejected");
+    pushAudit(`Rejected · ${item.recordName}`, "danger");
+    if (idx < items.length - 1) goNext();
+  }, [item, idx, items.length, onResolve, pushAudit, goNext]);
+  const handleSkip = useCallback(() => { pushAudit(`Skipped · ${item.recordName}`, "amber"); goNext(); }, [item, pushAudit, goNext]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "a" || e.key === "A") handleApprove();
+      else if (e.key === "r" || e.key === "R") handleReject();
+      else if (e.key === "s" || e.key === "S") handleSkip();
+      else if (e.key === "ArrowRight" || e.key === "j") goNext();
+      else if (e.key === "ArrowLeft" || e.key === "k") goPrev();
+      else if (e.key === "?") setShowShortcuts((v) => !v);
+      else if (e.key === "Escape") { setSelectedField(null); setShowShortcuts(false); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleApprove, handleReject, handleSkip, goNext, goPrev]);
 
   const pendingLeft = items.filter((i) => i.status === "pending").length;
   const approved = items.filter((i) => i.status === "approved").length;
   const rejected = items.filter((i) => i.status === "rejected").length;
+  const completionPct = Math.round(((approved + rejected) / items.length) * 100);
+
+  const confTier = (c: number) => (c >= 90 ? "high" : c >= 75 ? "medium" : "low");
+  const filtered = allFields
+    .filter((f) => confidenceFilter === "all" || confTier(f.confidence) === confidenceFilter)
+    .filter((f) => !fieldQuery || f.name.toLowerCase().includes(fieldQuery.toLowerCase()) || f.value.toLowerCase().includes(fieldQuery.toLowerCase()));
 
   const grouped = useMemo(() => {
-    const map = new Map<string, typeof item.fields>();
-    (item.fields ?? []).forEach((f) => {
+    const map = new Map<string, typeof filtered>();
+    filtered.forEach((f) => {
       const key = f.group ?? "fields";
       const arr = map.get(key) ?? [];
       arr.push(f);
       map.set(key, arr);
     });
     return Array.from(map.entries());
-  }, [item]);
+  }, [filtered]);
+
+  const dist = useMemo(() => {
+    const h = allFields.filter((f) => confTier(f.confidence) === "high").length;
+    const m = allFields.filter((f) => confTier(f.confidence) === "medium").length;
+    const l = allFields.filter((f) => confTier(f.confidence) === "low").length;
+    const avg = allFields.length ? Math.round(allFields.reduce((s, f) => s + f.confidence, 0) / allFields.length) : 0;
+    return { h, m, l, avg };
+  }, [allFields]);
+
+  const handleSelectField = (name: string) => {
+    setSelectedField(name);
+    pushAudit(`Located "${name}" on source`, "cyan");
+    requestAnimationFrame(() => {
+      const el = lhsRef.current?.querySelector(`[data-field="${CSS.escape(name)}"]`);
+      if (el && "scrollIntoView" in el) (el as HTMLElement).scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
+
+  const handleEdit = (fname: string, val: string) => {
+    setEdits((e) => ({ ...e, [`${item.id}:${fname}`]: val }));
+  };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header bar */}
-      <div className="border-b border-border px-4 py-2 flex items-center gap-3 bg-card">
-        <button onClick={onBack} className="h-7 px-2 rounded text-[11px] font-mono border border-border hover:border-cyan/30 flex items-center gap-1">
+    <div className="flex flex-col h-full bg-gradient-to-br from-surface/40 via-background to-surface/20 relative">
+      {/* Sticky top toolbar */}
+      <div className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur-xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
+        <button onClick={onBack} className="h-8 px-2.5 rounded-md text-[11px] font-mono border border-border hover:border-cyan/40 hover:bg-cyan/5 flex items-center gap-1 transition">
           <ChevronLeft className="size-3" /> BATCHES
         </button>
         <div className="flex items-center gap-2 text-[11px] font-mono">
           <UseCaseTag solId={job.solutionId} />
-          <FormatTag kind={previewKind} />
+          <FormatTag kind={view} />
           <span className="text-muted-foreground">·</span>
-          <span className="font-semibold text-foreground">{item.recordName ?? item.summary}</span>
-          <span className="text-muted-foreground">Confidence Score: <span className="text-success">{item.confidence}%</span></span>
+          <span className="font-semibold text-foreground truncate max-w-[280px]">{item.recordName ?? item.summary}</span>
         </div>
-        <div className="ml-auto flex items-center gap-2 text-[11px] font-mono">
-          <span className="text-muted-foreground">Record</span>
-          <button onClick={goPrev} disabled={idx === 0} className="size-7 rounded border border-border grid place-items-center disabled:opacity-40"><ChevronLeft className="size-3" /></button>
-          <span className="font-mono">{idx + 1} / {items.length}</span>
-          <button onClick={goNext} disabled={idx === items.length - 1} className="size-7 rounded border border-border grid place-items-center disabled:opacity-40"><ChevronRight className="size-3" /></button>
-          <span className="ml-2 px-2 h-7 rounded border border-amber/30 text-amber bg-amber/5 flex items-center gap-1">
-            <Layers className="size-3" /> {pendingLeft} pending · {approved} ✓ · {rejected} ✕
-          </span>
+
+        <div className="hidden md:flex items-center gap-2 ml-2">
+          <div className="w-40 h-1.5 rounded-full bg-surface-elevated overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-cyan via-success to-success transition-all" style={{ width: `${completionPct}%` }} />
+          </div>
+          <span className="text-[10px] font-mono text-muted-foreground">{completionPct}% · {approved + rejected}/{items.length}</span>
+        </div>
+
+        <div className="ml-auto flex items-center gap-1.5">
+          <button onClick={() => setShowAudit((v) => !v)} className={`h-8 px-2 rounded-md text-[10px] font-mono border flex items-center gap-1 transition ${showAudit ? "border-cyan/40 bg-cyan/10 text-cyan" : "border-border hover:border-cyan/30"}`} title="Audit trail">
+            <History className="size-3" /> AUDIT
+          </button>
+          <button onClick={() => setShowShortcuts((v) => !v)} className="h-8 w-8 grid place-items-center rounded-md border border-border hover:border-cyan/30 transition" title="Keyboard shortcuts (?)">
+            <Keyboard className="size-3.5" />
+          </button>
+          <div className="h-6 w-px bg-border mx-1" />
+          <span className="text-[10px] font-mono text-muted-foreground">REC</span>
+          <button onClick={goPrev} disabled={idx === 0} className="size-7 rounded-md border border-border grid place-items-center disabled:opacity-40 hover:border-cyan/30 transition"><ChevronLeft className="size-3" /></button>
+          <span className="font-mono text-[11px] tabular-nums px-1">{idx + 1} / {items.length}</span>
+          <button onClick={goNext} disabled={idx === items.length - 1} className="size-7 rounded-md border border-border grid place-items-center disabled:opacity-40 hover:border-cyan/30 transition"><ChevronRight className="size-3" /></button>
         </div>
       </div>
 
       {/* Two-panel: LHS preview, RHS fields */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 flex-1 min-h-[600px]">
-        {/* LHS preview */}
-        <div className="border-r border-border bg-surface/30 flex flex-col">
-          <div className="px-3 py-2 border-b border-border flex items-center gap-2 bg-surface-elevated/40">
-            <button disabled className="h-7 w-7 grid place-items-center rounded border border-border opacity-50"><ChevronLeft className="size-3" /></button>
-            <span className="text-[10px] font-mono">Page 1 / 1</span>
-            <button disabled className="h-7 w-7 grid place-items-center rounded border border-border opacity-50"><ChevronRight className="size-3" /></button>
-            <span className="ml-2 text-[10px] font-mono text-muted-foreground">100%</span>
-            <span className="ml-auto text-[10px] font-mono text-muted-foreground">{item.recordName}.{previewKind}</span>
+      <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] gap-0 flex-1 min-h-[600px]">
+        {/* ============ LHS ============ */}
+        <div className="border-r border-border bg-surface/20 flex flex-col min-h-0">
+          <div className="px-3 py-2 border-b border-border flex items-center gap-1.5 bg-card/60 backdrop-blur flex-wrap">
+            <div className="flex items-center rounded-md border border-border overflow-hidden">
+              <button onClick={() => setView("html")} className={`h-7 px-2 text-[10px] font-mono flex items-center gap-1 transition ${view === "html" ? "bg-cyan/10 text-cyan" : "text-muted-foreground hover:bg-surface-elevated"}`}>
+                <Globe className="size-3" /> HTML
+              </button>
+              <button onClick={() => setView("pdf")} className={`h-7 px-2 text-[10px] font-mono flex items-center gap-1 transition ${view === "pdf" ? "bg-amber/10 text-amber" : "text-muted-foreground hover:bg-surface-elevated"}`}>
+                <FileText className="size-3" /> PDF
+              </button>
+            </div>
+            <div className="flex items-center rounded-md border border-border">
+              <button onClick={() => setZoom((z) => Math.max(60, z - 10))} className="h-7 w-7 grid place-items-center hover:bg-surface-elevated transition"><ZoomOut className="size-3" /></button>
+              <span className="text-[10px] font-mono px-1 tabular-nums w-10 text-center">{zoom}%</span>
+              <button onClick={() => setZoom((z) => Math.min(160, z + 10))} className="h-7 w-7 grid place-items-center hover:bg-surface-elevated transition"><ZoomIn className="size-3" /></button>
+            </div>
+            <div className="flex items-center rounded-md border border-border">
+              <button disabled className="h-7 w-7 grid place-items-center opacity-40"><ChevronLeft className="size-3" /></button>
+              <span className="text-[10px] font-mono px-1">P 1/1</span>
+              <button disabled className="h-7 w-7 grid place-items-center opacity-40"><ChevronRight className="size-3" /></button>
+            </div>
+            <div className="relative flex-1 min-w-[140px] max-w-[200px]">
+              <Search className="size-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={lhsSearch}
+                onChange={(e) => setLhsSearch(e.target.value)}
+                placeholder="Find on source…"
+                className="w-full h-7 pl-7 pr-2 rounded-md bg-input border border-border text-[11px] font-mono focus:border-cyan/40 outline-none transition"
+              />
+            </div>
+            <button onClick={() => setLanguage((l) => l === "original" ? "translated" : "original")} className={`h-7 px-2 rounded-md text-[10px] font-mono border flex items-center gap-1 transition ${language === "translated" ? "border-cyan/40 bg-cyan/10 text-cyan" : "border-border hover:border-cyan/30"}`}>
+              <Languages className="size-3" /> {language === "original" ? "EN" : "↔ EN"}
+            </button>
+            <span className="ml-auto text-[10px] font-mono text-muted-foreground truncate max-w-[160px]">{item.recordName}.{view}</span>
           </div>
-          <div className="flex-1 overflow-y-auto bg-neutral-200/40 dark:bg-neutral-900/40 p-4">
-            {previewKind === "pdf"
-              ? <RealisticPdf solutionId={job.solutionId} item={item} />
-              : <RealisticHtml solutionId={job.solutionId} item={item} />}
+
+          <div className="flex-1 overflow-y-auto bg-[linear-gradient(135deg,oklch(0.96_0.005_220),oklch(0.97_0.008_180))] p-4 relative" ref={lhsRef}>
+            <div className="absolute top-3 right-6 z-10 flex flex-col gap-1 text-[9px] font-mono">
+              <span className="px-1.5 py-0.5 rounded bg-success/15 border border-success/40 text-success backdrop-blur">● SELECTED</span>
+              <span className="px-1.5 py-0.5 rounded bg-amber/15 border border-amber/40 text-amber backdrop-blur">● EXTRACTED</span>
+            </div>
+            <div style={{ zoom: `${zoom}%` }} className="transition-all">
+              <SourceWithHighlights
+                solutionId={job.solutionId}
+                item={item}
+                view={view}
+                selectedField={selectedField}
+                search={lhsSearch}
+                language={language}
+              />
+            </div>
+            {language === "translated" && (
+              <div className="mt-4 p-3 rounded-lg border border-cyan/30 bg-cyan/5 text-[11px] font-mono text-cyan">
+                <Languages className="size-3 inline mr-1" /> Translated view · auto-detected source language: Mandarin · structured values normalized to English on the right.
+              </div>
+            )}
           </div>
         </div>
 
-        {/* RHS structured fields */}
-        <div className="flex flex-col bg-card">
-          <div className="px-3 py-2 border-b border-border bg-surface-elevated/40 space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold tracking-wide">{item.recordName}</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan/10 border border-cyan/30 text-cyan">
-                {(item.fields ?? []).length} FIELDS
+        {/* ============ RHS ============ */}
+        <div className="flex flex-col bg-card min-h-0">
+          <div className="px-3 py-2 border-b border-border bg-card/80 backdrop-blur space-y-2 sticky top-0 z-10">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Sparkles className="size-3.5 text-cyan" />
+              <span className="text-[11px] font-semibold tracking-wide">Extracted attributes</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan/10 border border-cyan/30 text-cyan">{allFields.length} FIELDS</span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                item.confidence >= 90 ? "bg-success/10 border-success/30 text-success"
+                : item.confidence >= 75 ? "bg-amber/10 border-amber/30 text-amber"
+                : "bg-danger/10 border-danger/30 text-danger"
+              }`}>
+                AI {item.confidence}%
               </span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber/10 border border-amber/30 text-amber">
-                {(item.fields ?? []).filter((f) => f.confidence < 85).length} LOW CONF
-              </span>
-              <span className="ml-auto text-[10px] font-mono text-muted-foreground">EXTRACTED FIELDS</span>
+              <button
+                onClick={() => {
+                  const name = prompt("New attribute name?");
+                  if (!name) return;
+                  const value = prompt("Value?") ?? "";
+                  const group = prompt("Group?", "custom") ?? "custom";
+                  setExtraFields((f) => [...f, { name, value, group }]);
+                  pushAudit(`Added attribute "${name}"`, "cyan");
+                }}
+                className="ml-auto h-7 px-2 rounded-md text-[10px] font-mono border border-cyan/30 text-cyan hover:bg-cyan/10 flex items-center gap-1 transition"
+                title="Add attribute"
+              >
+                <Plus className="size-3" /> ADD
+              </button>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="flex-1 relative">
@@ -300,96 +451,320 @@ function ValidationScreen({
                 <input
                   value={fieldQuery}
                   onChange={(e) => setFieldQuery(e.target.value)}
-                  placeholder="Search field name or value…"
-                  className="w-full h-7 pl-7 pr-2 rounded bg-input border border-border text-[11px] font-mono"
+                  placeholder="Search attribute name or value…"
+                  className="w-full h-7 pl-7 pr-2 rounded-md bg-input border border-border text-[11px] font-mono focus:border-cyan/40 outline-none transition"
                 />
               </div>
-              <select value={confidenceFilter} onChange={(e) => setConfidenceFilter(e.target.value as "all" | "low")} className="h-7 px-2 rounded bg-input border border-border text-[11px] font-mono">
-                <option value="all">All fields</option>
-                <option value="low">Low confidence (&lt;85%)</option>
-              </select>
-              <button title="Field info" className="h-7 w-7 grid place-items-center rounded border border-border hover:border-cyan/30"><Info className="size-3" /></button>
+              <div className="flex items-center rounded-md border border-border overflow-hidden text-[10px] font-mono">
+                {(["all", "high", "medium", "low"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setConfidenceFilter(t)}
+                    className={`h-7 px-2 transition ${
+                      confidenceFilter === t
+                        ? t === "high" ? "bg-success/15 text-success" : t === "medium" ? "bg-amber/15 text-amber" : t === "low" ? "bg-danger/15 text-danger" : "bg-cyan/15 text-cyan"
+                        : "text-muted-foreground hover:bg-surface-elevated"
+                    }`}
+                  >
+                    {t === "all" ? "ALL" : t === "high" ? `H·${dist.h}` : t === "medium" ? `M·${dist.m}` : `L·${dist.l}`}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-4">
+
+          <div className="flex-1 overflow-y-auto p-3 space-y-3">
             {grouped.map(([group, fields]) => {
-              const visible = (fields ?? [])
-                .filter((f) => confidenceFilter === "all" || f.confidence < 85)
-                .filter((f) => !fieldQuery || f.name.toLowerCase().includes(fieldQuery.toLowerCase()) || f.value.toLowerCase().includes(fieldQuery.toLowerCase()));
-              if (visible.length === 0) return null;
+              const isCollapsed = collapsed[group];
+              const groupAvg = Math.round(fields.reduce((s, f) => s + f.confidence, 0) / fields.length);
               return (
-                <div key={group}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="text-[10px] font-semibold text-cyan tracking-widest uppercase bg-cyan/5 border border-cyan/20 rounded px-2 py-0.5">
-                      {group}
+                <div key={group} className="rounded-xl border border-border bg-gradient-to-b from-surface/30 to-surface-elevated/10 backdrop-blur-sm shadow-sm overflow-hidden">
+                  <button
+                    onClick={() => setCollapsed((c) => ({ ...c, [group]: !c[group] }))}
+                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-surface-elevated/40 transition"
+                  >
+                    <ChevronDown className={`size-3 text-muted-foreground transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
+                    <span className="text-[10px] font-semibold text-cyan tracking-widest uppercase">{group}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">{fields.length}</span>
+                    <div className="ml-auto flex items-center gap-1.5">
+                      <Gauge className="size-3 text-muted-foreground" />
+                      <span className={`text-[10px] font-mono ${groupAvg >= 90 ? "text-success" : groupAvg >= 75 ? "text-amber" : "text-danger"}`}>{groupAvg}% avg</span>
                     </div>
-                    <div className="h-px flex-1 bg-border" />
-                    <span className="text-[10px] font-mono text-muted-foreground">{visible.length}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {visible.map((f) => {
-                      const tone = f.confidence >= 90 ? "success" : f.confidence >= 80 ? "cyan" : f.confidence >= 70 ? "amber" : "danger";
-                      const ring = tone === "success" ? "border-l-success" : tone === "cyan" ? "border-l-cyan" : tone === "amber" ? "border-l-amber" : "border-l-danger";
-                      const txt  = tone === "success" ? "text-success" : tone === "cyan" ? "text-cyan" : tone === "amber" ? "text-amber" : "text-danger";
-                      return (
-                        <div key={f.name} className={`group rounded border border-border border-l-2 ${ring} bg-surface/40 hover:bg-surface-elevated/60 transition p-2.5`}>
-                          <div className="flex items-center justify-between gap-1">
-                            <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase truncate">{f.name}</div>
-                            <div className={`text-[10px] font-mono font-semibold ${txt} shrink-0`}>{f.confidence}%</div>
+                  </button>
+                  {!isCollapsed && (
+                    <div className="px-2 pb-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {fields.map((f) => {
+                        const tier = confTier(f.confidence);
+                        const ring = tier === "high" ? "border-l-success" : tier === "medium" ? "border-l-amber" : "border-l-danger";
+                        const chipTone = tier === "high" ? "bg-success/15 text-success border-success/30" : tier === "medium" ? "bg-amber/15 text-amber border-amber/30" : "bg-danger/15 text-danger border-danger/30";
+                        const isSelected = selectedField === f.name;
+                        const cKey = `${item.id}:${f.name}`;
+                        const hasComment = !!comments[cKey];
+                        return (
+                          <div
+                            key={f.name}
+                            onClick={() => handleSelectField(f.name)}
+                            className={`group cursor-pointer rounded-lg border border-l-2 ${ring} bg-card hover:bg-surface-elevated/40 transition p-2.5 ${isSelected ? "ring-2 ring-cyan/60 shadow-md" : ""}`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase truncate flex items-center gap-1">
+                                {isSelected && <CircleDot className="size-2.5 text-cyan" />}
+                                {f.name}
+                              </div>
+                              <span className={`text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded border ${chipTone}`}>{f.confidence}%</span>
+                            </div>
+                            <input
+                              value={f.value}
+                              onChange={(e) => handleEdit(f.name, e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full text-sm font-mono mt-1 bg-transparent border-0 border-b border-transparent hover:border-border focus:border-cyan/40 outline-none px-0 py-0.5 transition"
+                              placeholder="empty"
+                            />
+                            <div className="mt-1.5 flex items-center justify-between text-[9px] font-mono">
+                              <span className={`px-1.5 py-0.5 rounded ${tier === "high" ? "bg-success/10 text-success" : tier === "medium" ? "bg-amber/10 text-amber" : "bg-danger/10 text-danger"}`}>
+                                {tier === "high" ? "✓ AI VERIFIED" : tier === "medium" ? "◐ REVIEW" : "⚠ LOW CONF"}
+                              </span>
+                              <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition">
+                                <button onClick={(e) => { e.stopPropagation(); handleSelectField(f.name); }} className="text-muted-foreground hover:text-cyan flex items-center gap-0.5">
+                                  <MapPin className="size-2.5" /> LOCATE
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); setOpenComment(openComment === cKey ? null : cKey); }} className={`flex items-center gap-0.5 ${hasComment ? "text-cyan" : "text-muted-foreground hover:text-cyan"}`}>
+                                  <MessageSquare className="size-2.5" /> {hasComment ? "NOTE" : "+ NOTE"}
+                                </button>
+                              </div>
+                            </div>
+                            {openComment === cKey && (
+                              <div className="mt-2 pt-2 border-t border-border" onClick={(e) => e.stopPropagation()}>
+                                <textarea
+                                  value={comments[cKey] ?? ""}
+                                  onChange={(e) => setComments((c) => ({ ...c, [cKey]: e.target.value }))}
+                                  placeholder="Add inline note for this attribute…"
+                                  className="w-full h-12 text-[11px] font-mono bg-input rounded p-1.5 border border-border focus:border-cyan/40 outline-none"
+                                />
+                              </div>
+                            )}
                           </div>
-                          <div className="text-sm font-mono mt-1 break-words" title={f.value}>{f.value || <span className="text-muted-foreground italic">empty</span>}</div>
-                          <div className="mt-2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition">
-                            <button className="text-[10px] font-mono text-muted-foreground hover:text-cyan">EDIT</button>
-                            <button className="text-[10px] font-mono text-muted-foreground hover:text-cyan">LOCATE ↗</button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
 
-            {/* Per-record decision + feedback */}
-            <div className="rounded border border-border p-3 space-y-2">
-              <div className="text-[10px] font-mono tracking-widest text-muted-foreground">FEEDBACK · this record</div>
-              <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Anything off in this record?" className="w-full h-14 rounded bg-input border border-border text-xs p-2" />
+            {filtered.length === 0 && (
+              <div className="text-center text-[11px] font-mono text-muted-foreground py-10">
+                No attributes match your filter.
+              </div>
+            )}
+
+            <div className="rounded-xl border border-border p-3 space-y-2 bg-gradient-to-b from-surface/30 to-card">
+              <div className="text-[10px] font-mono tracking-widest text-muted-foreground flex items-center gap-1.5"><MessageSquare className="size-3" /> FEEDBACK · THIS RECORD</div>
+              <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Anything off in this record?" className="w-full h-14 rounded-md bg-input border border-border text-xs p-2 focus:border-cyan/40 outline-none" />
               <div className="flex gap-2">
-                <button disabled={!feedback || sent} onClick={() => { onFeedback("up", feedback); setSent(true); }} className="h-7 px-2 rounded border border-success/40 text-success text-[11px] font-mono disabled:opacity-50">👍 SEND</button>
-                <button disabled={!feedback || sent} onClick={() => { onFeedback("down", feedback); setSent(true); }} className="h-7 px-2 rounded border border-danger/40 text-danger text-[11px] font-mono disabled:opacity-50">👎 SEND</button>
+                <button disabled={!feedback || sent} onClick={() => { onFeedback("up", feedback); setSent(true); }} className="h-7 px-2 rounded-md border border-success/40 text-success text-[11px] font-mono disabled:opacity-50 hover:bg-success/10 transition">👍 SEND</button>
+                <button disabled={!feedback || sent} onClick={() => { onFeedback("down", feedback); setSent(true); }} className="h-7 px-2 rounded-md border border-danger/40 text-danger text-[11px] font-mono disabled:opacity-50 hover:bg-danger/10 transition">👎 SEND</button>
                 {sent && <span className="text-[10px] font-mono text-muted-foreground self-center">Sent · thanks.</span>}
               </div>
             </div>
           </div>
 
-          {/* Action bar */}
-          <div className="border-t border-border px-3 py-2 flex items-center gap-2 bg-card">
-            <span className="text-[10px] font-mono text-muted-foreground">
+          {/* Sticky action bar */}
+          <div className="sticky bottom-0 border-t border-border px-3 py-2.5 flex items-center gap-2 bg-card/90 backdrop-blur-xl">
+            <span className="text-[10px] font-mono text-muted-foreground hidden md:block">
               {item.status === "pending"
-                ? "Decide on this record to proceed"
+                ? <span className="flex items-center gap-1"><Activity className="size-3 text-amber animate-pulse" /> AI processed · awaiting decision</span>
                 : <span className={item.status === "approved" ? "text-success" : "text-danger"}>{item.status.toUpperCase()} by {item.reviewer ?? "you"}</span>}
             </span>
-            <button onClick={handleSkip} className="ml-auto h-8 px-3 rounded text-[11px] font-mono border border-border hover:border-cyan/30 flex items-center gap-1.5">
-              <SkipForward className="size-3" /> SKIP REVIEW
+            <button onClick={handleSkip} className="ml-auto h-8 px-3 rounded-md text-[11px] font-mono border border-border hover:border-cyan/30 hover:bg-cyan/5 flex items-center gap-1.5 transition">
+              <SkipForward className="size-3" /> SKIP <kbd className="text-[9px] opacity-60">S</kbd>
             </button>
-            <button onClick={handleReject} className="h-8 px-3 rounded text-[11px] font-mono border border-danger/40 text-danger hover:bg-danger/10 flex items-center gap-1.5">
-              <X className="size-3.5" /> REJECT
+            <button onClick={handleReject} className="h-8 px-3 rounded-md text-[11px] font-mono border border-danger/40 text-danger hover:bg-danger/10 flex items-center gap-1.5 transition">
+              <X className="size-3.5" /> REJECT <kbd className="text-[9px] opacity-60">R</kbd>
             </button>
-            <button onClick={handleApprove} className="h-8 px-3 rounded text-[11px] font-mono bg-success/15 border border-success/40 text-success hover:bg-success/25 flex items-center gap-1.5">
-              <Check className="size-3.5" /> APPROVE & NEXT
+            <button onClick={handleApprove} className="h-8 px-3 rounded-md text-[11px] font-mono bg-success/15 border border-success/40 text-success hover:bg-success/25 flex items-center gap-1.5 transition shadow-sm">
+              <Check className="size-3.5" /> APPROVE & NEXT <kbd className="text-[9px] opacity-60">A</kbd>
             </button>
             <button
               disabled={pendingLeft > 0}
               onClick={onComplete}
-              className="h-8 px-3 rounded text-[11px] font-mono bg-cyan text-background disabled:opacity-40 flex items-center gap-1.5"
-              title={pendingLeft > 0 ? `${pendingLeft} records still pending` : "Complete batch review and unlock job download"}
+              className="h-8 px-3 rounded-md text-[11px] font-mono bg-gradient-to-r from-cyan to-cyan/90 text-white disabled:opacity-40 flex items-center gap-1.5 shadow-md hover:shadow-lg transition"
+              title={pendingLeft > 0 ? `${pendingLeft} records still pending` : "Submit batch"}
             >
-              {pendingLeft > 0 ? <Lock className="size-3" /> : <Check className="size-3" />}
-              COMPLETE BATCH
+              {pendingLeft > 0 ? <Lock className="size-3" /> : <Save className="size-3" />}
+              SUBMIT BATCH
             </button>
           </div>
         </div>
       </div>
+
+      {/* ============ Floating confidence analytics ============ */}
+      <div className="fixed bottom-20 left-4 z-20 hidden xl:block">
+        <div className="rounded-xl border border-border bg-card/80 backdrop-blur-xl shadow-lg p-3 w-56 space-y-2">
+          <div className="flex items-center gap-1.5 text-[10px] font-mono tracking-widest text-muted-foreground">
+            <Gauge className="size-3 text-cyan" /> CONFIDENCE ANALYTICS
+          </div>
+          <div className="flex items-end gap-2">
+            <div className="text-2xl font-semibold tabular-nums">{dist.avg}<span className="text-xs text-muted-foreground">%</span></div>
+            <div className="text-[10px] font-mono text-muted-foreground pb-1">avg this record</div>
+          </div>
+          <div className="h-2 rounded-full overflow-hidden flex bg-surface-elevated">
+            <div className="bg-success" style={{ width: `${(dist.h / Math.max(1, allFields.length)) * 100}%` }} />
+            <div className="bg-amber" style={{ width: `${(dist.m / Math.max(1, allFields.length)) * 100}%` }} />
+            <div className="bg-danger" style={{ width: `${(dist.l / Math.max(1, allFields.length)) * 100}%` }} />
+          </div>
+          <div className="grid grid-cols-3 gap-1 text-[9px] font-mono">
+            <div className="text-success">● HIGH {dist.h}</div>
+            <div className="text-amber">● MED {dist.m}</div>
+            <div className="text-danger">● LOW {dist.l}</div>
+          </div>
+          <div className="h-px bg-border" />
+          <div className="text-[10px] font-mono text-muted-foreground tracking-widest">BATCH PROGRESS</div>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1.5 rounded-full bg-surface-elevated overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-cyan to-success transition-all" style={{ width: `${completionPct}%` }} />
+            </div>
+            <span className="text-[10px] font-mono tabular-nums">{completionPct}%</span>
+          </div>
+          <div className="text-[9px] font-mono text-muted-foreground">
+            <span className="text-success">✓{approved}</span> · <span className="text-danger">✕{rejected}</span> · <span className="text-amber">⏳{pendingLeft}</span>
+          </div>
+          {/* mini activity timeline */}
+          <div className="h-px bg-border" />
+          <div className="text-[10px] font-mono text-muted-foreground tracking-widest">MINI TIMELINE</div>
+          <div className="flex gap-0.5 h-4 items-end">
+            {items.map((it, i) => {
+              const c = it.status === "approved" ? "bg-success" : it.status === "rejected" ? "bg-danger" : "bg-amber/40";
+              const h = it.status === "pending" ? "h-1.5" : "h-3";
+              return <div key={it.id} className={`flex-1 rounded-sm ${c} ${h} ${i === idx ? "ring-1 ring-cyan" : ""}`} title={it.recordName} />;
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ============ Audit trail drawer ============ */}
+      {showAudit && (
+        <div className="fixed top-16 right-4 z-30 w-80 max-h-[70vh] rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-2xl flex flex-col">
+          <div className="px-3 py-2 border-b border-border flex items-center gap-2">
+            <History className="size-3.5 text-cyan" />
+            <span className="text-[11px] font-semibold tracking-wide">Audit trail · activity</span>
+            <button onClick={() => setShowAudit(false)} className="ml-auto h-6 w-6 grid place-items-center hover:bg-surface-elevated rounded transition"><X className="size-3" /></button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {auditLog.map((a, i) => (
+              <div key={i} className="flex gap-2 text-[10px] font-mono p-1.5 rounded hover:bg-surface-elevated/40">
+                <span className={`mt-1 size-1.5 rounded-full shrink-0 ${
+                  a.tone === "success" ? "bg-success" : a.tone === "danger" ? "bg-danger" : a.tone === "amber" ? "bg-amber" : "bg-cyan"
+                }`} />
+                <div className="flex-1">
+                  <div className="text-foreground">{a.msg}</div>
+                  <div className="text-muted-foreground">{new Date(a.at).toLocaleTimeString()}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ============ Keyboard shortcuts modal ============ */}
+      {showShortcuts && (
+        <div className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm grid place-items-center p-4" onClick={() => setShowShortcuts(false)}>
+          <div className="rounded-2xl border border-border bg-card shadow-2xl p-5 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-3">
+              <Keyboard className="size-4 text-cyan" />
+              <span className="text-sm font-semibold tracking-tight">Keyboard shortcuts</span>
+              <button onClick={() => setShowShortcuts(false)} className="ml-auto h-6 w-6 grid place-items-center hover:bg-surface-elevated rounded transition"><X className="size-3" /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+              {[
+                ["A", "Approve & next"],
+                ["R", "Reject"],
+                ["S", "Skip"],
+                ["→ / J", "Next record"],
+                ["← / K", "Previous record"],
+                ["?", "Toggle this panel"],
+                ["Esc", "Clear selection"],
+              ].map(([k, v]) => (
+                <div key={k} className="flex items-center gap-2 p-2 rounded border border-border bg-surface/30">
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface-elevated border border-border text-[10px]">{k}</kbd>
+                  <span className="text-muted-foreground">{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Wraps the realistic source renderer with field-highlighting overlay using data-field attrs.
+function SourceWithHighlights({
+  solutionId, item, view, selectedField, search, language,
+}: {
+  solutionId: string;
+  item: HitlItem;
+  view: "html" | "pdf";
+  selectedField: string | null;
+  search: string;
+  language: "original" | "translated";
+}) {
+  void language;
+  const fieldByValue = useMemo(() => {
+    const m: Record<string, { name: string; conf: number }> = {};
+    (item.fields ?? []).forEach((f) => { if (f.value) m[f.value.toLowerCase()] = { name: f.name, conf: f.confidence }; });
+    return m;
+  }, [item]);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    const root = wrapRef.current;
+    const values = Object.keys(fieldByValue);
+    if (values.length === 0) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => {
+        const txt = n.nodeValue?.toLowerCase() ?? "";
+        if (!txt.trim()) return NodeFilter.FILTER_REJECT;
+        const parent = n.parentElement as HTMLElement | null;
+        if (parent?.dataset?.field) return NodeFilter.FILTER_REJECT;
+        if (parent?.tagName === "INPUT" || parent?.tagName === "TEXTAREA" || parent?.tagName === "SCRIPT") return NodeFilter.FILTER_REJECT;
+        return values.some((v) => txt.includes(v)) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+    const toProcess: Text[] = [];
+    let n: Node | null;
+    while ((n = walker.nextNode())) toProcess.push(n as Text);
+    toProcess.forEach((node) => {
+      let html = node.nodeValue ?? "";
+      values.forEach((v) => {
+        const meta = fieldByValue[v];
+        const re = new RegExp(`(${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "ig");
+        html = html.replace(re, `<mark data-field="${meta.name}" class="hitl-mark" style="background:rgba(245,158,11,0.15);color:inherit;padding:1px 3px;border-radius:3px;border-bottom:2px solid rgba(245,158,11,0.6);transition:all .2s;cursor:help" title="${meta.name} · ${meta.conf}%">$1</mark>`);
+      });
+      const span = document.createElement("span");
+      span.innerHTML = html;
+      node.replaceWith(span);
+    });
+  }, [fieldByValue, item.id, view]);
+
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    wrapRef.current.querySelectorAll<HTMLElement>("mark.hitl-mark").forEach((el) => {
+      const isSel = el.dataset.field === selectedField;
+      el.style.background = isSel ? "rgba(34,197,94,0.28)" : "rgba(245,158,11,0.15)";
+      el.style.borderColor = isSel ? "rgba(34,197,94,0.9)" : "rgba(245,158,11,0.6)";
+      el.style.boxShadow = isSel ? "0 0 0 2px rgba(34,197,94,0.35)" : "none";
+    });
+  }, [selectedField]);
+
+  const matchesSearch = !search || JSON.stringify(item).toLowerCase().includes(search.toLowerCase());
+
+  return (
+    <div ref={wrapRef} className={`transition ${matchesSearch ? "" : "opacity-40"}`}>
+      {view === "pdf"
+        ? <RealisticPdf solutionId={solutionId} item={item} />
+        : <RealisticHtml solutionId={solutionId} item={item} />}
     </div>
   );
 }

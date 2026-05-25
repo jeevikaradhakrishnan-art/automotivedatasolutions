@@ -230,6 +230,7 @@ function ValidationScreen({
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
   const [manualAnnot, setManualAnnot] = useState<Record<string, true>>({});
+  const [confOverride, setConfOverride] = useState<Record<string, "high" | "medium" | "low">>({});
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; text: string } | null>(null);
   const [ctxQuery, setCtxQuery] = useState("");
   const [auditLog, setAuditLog] = useState<{ at: string; msg: string; tone: "cyan" | "success" | "danger" | "amber" }[]>(
@@ -286,8 +287,10 @@ function ValidationScreen({
   const completionPct = Math.round(((approved + rejected) / items.length) * 100);
 
   const confTier = (c: number) => (c >= 90 ? "high" : c >= 75 ? "medium" : "low");
+  const tierOf = (f: { name: string; confidence: number }) =>
+    confOverride[`${item.id}:${f.name}`] ?? confTier(f.confidence);
   const filtered = allFields
-    .filter((f) => confidenceFilter === "all" || confTier(f.confidence) === confidenceFilter)
+    .filter((f) => confidenceFilter === "all" || tierOf(f) === confidenceFilter)
     .filter((f) => !fieldQuery || f.name.toLowerCase().includes(fieldQuery.toLowerCase()) || f.value.toLowerCase().includes(fieldQuery.toLowerCase()));
 
   const grouped = useMemo(() => {
@@ -302,9 +305,9 @@ function ValidationScreen({
   }, [filtered]);
 
   const dist = useMemo(() => {
-    const h = allFields.filter((f) => confTier(f.confidence) === "high").length;
-    const m = allFields.filter((f) => confTier(f.confidence) === "medium").length;
-    const l = allFields.filter((f) => confTier(f.confidence) === "low").length;
+    const h = allFields.filter((f) => tierOf(f) === "high").length;
+    const m = allFields.filter((f) => tierOf(f) === "medium").length;
+    const l = allFields.filter((f) => tierOf(f) === "low").length;
     const avg = allFields.length ? Math.round(allFields.reduce((s, f) => s + f.confidence, 0) / allFields.length) : 0;
     return { h, m, l, avg };
   }, [allFields]);
@@ -509,9 +512,10 @@ function ValidationScreen({
                   {!isCollapsed && (
                     <div className="px-2 pb-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {fields.map((f) => {
-                        const tier = confTier(f.confidence);
+                        const cKeyTier = `${item.id}:${f.name}`;
+                        const tier = confOverride[cKeyTier] ?? confTier(f.confidence);
                         const ring = tier === "high" ? "border-l-success" : tier === "medium" ? "border-l-amber" : "border-l-danger";
-                        const chipTone = tier === "high" ? "bg-success/15 text-success border-success/30" : tier === "medium" ? "bg-amber/15 text-amber border-amber/30" : "bg-danger/15 text-danger border-danger/30";
+                        const chipTone = tier === "high" ? "bg-success/15 text-success border-success/40" : tier === "medium" ? "bg-amber/15 text-amber border-amber/40" : "bg-danger/15 text-danger border-danger/40";
                         const isSelected = selectedField === f.name;
                         const cKey = `${item.id}:${f.name}`;
                         const hasComment = !!comments[cKey];
@@ -549,7 +553,21 @@ function ValidationScreen({
                                 })()}
                                 {f.name}
                               </div>
-                              <span className={`text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded border ${chipTone}`}>{f.confidence}%</span>
+                              <select
+                                value={tier}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => {
+                                  const v = e.target.value as "high" | "medium" | "low";
+                                  setConfOverride((c) => ({ ...c, [cKeyTier]: v }));
+                                  pushAudit(`Confidence set to ${v.toUpperCase()} · ${f.name}`, v === "high" ? "success" : v === "medium" ? "amber" : "danger");
+                                }}
+                                title="Set confidence tier"
+                                className={`text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded border cursor-pointer outline-none focus:ring-2 focus:ring-cyan/40 ${chipTone}`}
+                              >
+                                <option value="high">● HIGH</option>
+                                <option value="medium">● MEDIUM</option>
+                                <option value="low">● LOW</option>
+                              </select>
                             </div>
                             <input
                               value={f.value}

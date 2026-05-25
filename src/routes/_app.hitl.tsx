@@ -1112,6 +1112,117 @@ function GenericSitePage({ f, item }: { f: Record<string, string>; item: HitlIte
   );
 }
 
+/* ---------- HTML: OEM Configurator (BMW / Tesla / Audi style build-and-price) ---------- */
+function OemConfiguratorPage({ f, item }: { f: Record<string, string>; item: HitlItem }) {
+  const oem = (f.oem || "BMW").toUpperCase();
+  const model = f.model || item.recordName?.split(" ")[0] || "iX1";
+  const trim = f.trim || "xDrive40";
+  const msrp = f.msrp || "$52,400";
+  const palette = oem.includes("TESLA")
+    ? { nav: "#000", accent: "#cc0000", chip: "#171a20", hero: "linear-gradient(160deg,#0f0f0f,#1f2937)", brand: "TESLA" }
+    : oem.includes("AUDI")
+    ? { nav: "#000", accent: "#bb0a30", chip: "#f2f2f2", hero: "linear-gradient(160deg,#1a1a1a,#404040)", brand: "AUDI" }
+    : { nav: "#fff", accent: "#1c69d4", chip: "#f4f4f4", hero: "linear-gradient(160deg,#0653b6,#001d6c)", brand: "BMW" };
+
+  return (
+    <div className="bg-white text-neutral-900 shadow-2xl rounded overflow-hidden mx-auto max-w-[680px] border border-neutral-200">
+      {/* OEM top nav bar */}
+      <div className="h-11 flex items-center px-5 text-[12px]" style={{ background: palette.nav, color: palette.nav === "#fff" ? "#000" : "#fff" }}>
+        <span className="font-black tracking-[0.2em] text-[14px]">{palette.brand}</span>
+        <nav className="flex gap-5 ml-8 opacity-80">
+          <span>Models</span><span className="font-semibold underline underline-offset-4">Build Your Own</span>
+          <span>Shopping Tools</span><span>Owners</span>
+        </nav>
+        <div className="ml-auto flex items-center gap-3 text-[10px] opacity-80"><span>📍 ZIP 94025</span><span>Sign In</span></div>
+      </div>
+
+      {/* Configurator hero — vehicle preview area */}
+      <div className="relative h-52 text-white p-5 flex flex-col justify-end" style={{ background: palette.hero }}>
+        <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_30%_40%,rgba(255,255,255,0.25),transparent_60%)]" />
+        <div className="absolute right-6 top-5 flex gap-1.5">
+          {["Exterior", "Interior", "360°", "VR"].map((t, i) => (
+            <span key={t} className={`text-[10px] px-2 py-1 rounded ${i === 0 ? "bg-white text-black font-semibold" : "border border-white/40"}`}>{t}</span>
+          ))}
+        </div>
+        <div className="relative">
+          <div className="text-[10px] tracking-[0.25em] opacity-80">{new Date().getFullYear()} · {palette.brand} CONFIGURATOR</div>
+          <div className="text-3xl font-light leading-none mt-2">{model}</div>
+          <div className="text-sm opacity-90 mt-1">{trim} · from <span className="font-semibold">{msrp}</span></div>
+        </div>
+        {/* car silhouette */}
+        <svg viewBox="0 0 400 80" className="absolute left-1/2 -translate-x-1/2 bottom-2 w-[70%] opacity-40">
+          <path d="M20 60 Q60 25 140 25 L220 25 Q280 25 320 50 L380 55 Q390 55 390 65 L20 65 Z" fill="#fff" />
+          <circle cx="110" cy="65" r="12" fill="#000" /><circle cx="110" cy="65" r="6" fill="#666" />
+          <circle cx="300" cy="65" r="12" fill="#000" /><circle cx="300" cy="65" r="6" fill="#666" />
+        </svg>
+      </div>
+
+      {/* Configurator stepper */}
+      <div className="flex items-center justify-between px-5 h-11 border-b text-[11px] bg-neutral-50">
+        {["Model", "Trim", "Exterior", "Interior", "Wheels", "Packages", "Summary"].map((s, i) => (
+          <div key={s} className="flex items-center gap-1.5">
+            <span className="w-5 h-5 rounded-full grid place-items-center text-[10px] font-semibold text-white" style={{ background: i <= 1 ? palette.accent : "#bbb" }}>{i + 1}</span>
+            <span className={i <= 1 ? "text-black font-semibold" : "text-neutral-500"}>{s}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Selected configuration table */}
+      <div className="p-5 space-y-4">
+        <div className="flex items-baseline justify-between border-b pb-2">
+          <h2 className="text-base font-semibold">Your Configuration</h2>
+          <button className="text-[11px] underline" style={{ color: palette.accent }}>Reset</button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
+          {[
+            ["Model", model],
+            ["Trim", trim],
+            ["Drivetrain", f.drivetrain || "AWD"],
+            ["Battery", `${f.battery_kwh || "81.5"} kWh`],
+            ["Range (EPA est.)", `${f.range_mi || "307"} mi`],
+            ["0–60 mph", `${f.zero_to_sixty_s || "4.6"} s`],
+            ["Exterior color", f.color || "Frozen Pure Grey Metallic"],
+            ["Interior", f.interior || "Veganza Mocha"],
+            ["Wheels", f.wheels || "20\" M Aerodynamic Bicolour"],
+          ].map(([k, v]) => (
+            <div key={k} className="flex justify-between border-b border-dashed border-neutral-200 py-1.5">
+              <span className="text-neutral-500">{k}</span><span className="font-medium text-right ml-3">{v}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-lg p-3" style={{ background: palette.chip, color: palette.chip === "#171a20" ? "#fff" : undefined }}>
+          <div className="text-[10px] tracking-widest opacity-70">PACKAGES INCLUDED</div>
+          <div className="grid grid-cols-2 gap-2 mt-2 text-[11px]">
+            {["Premium Package · $2,800", "Driving Assistant Pro · $1,700", "Harman Kardon Audio · $875", "Sky Lounge Glass Roof · $1,200"].map((p) => (
+              <div key={p} className="flex items-center gap-1"><span style={{ color: palette.accent }}>✓</span>{p}</div>
+            ))}
+          </div>
+        </div>
+
+        <table className="w-full text-[12px] border-t border-neutral-200">
+          <tbody>
+            <tr className="border-b"><td className="py-2 text-neutral-500">Base MSRP ({trim})</td><td className="py-2 text-right font-semibold">{msrp}</td></tr>
+            <tr className="border-b"><td className="py-2 text-neutral-500">Options & packages</td><td className="py-2 text-right">$6,575</td></tr>
+            <tr className="border-b"><td className="py-2 text-neutral-500">Destination & handling</td><td className="py-2 text-right">$995</td></tr>
+            <tr><td className="py-2 font-semibold">Total as configured</td><td className="py-2 text-right font-bold text-base" style={{ color: palette.accent }}>$60,070</td></tr>
+          </tbody>
+        </table>
+
+        <div className="flex gap-2 pt-2">
+          <button className="flex-1 text-[12px] py-2.5 rounded text-white font-semibold" style={{ background: palette.accent }}>Save Configuration</button>
+          <button className="flex-1 text-[12px] py-2.5 rounded border border-neutral-300 font-semibold">Find Dealer Inventory</button>
+        </div>
+
+        <div className="text-[10px] text-neutral-400 border-t pt-3">
+          © {new Date().getFullYear()} {oem}. Configurator data captured for <span className="font-mono">{item.recordName}</span> · scraped from public build-and-price journey.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- PDF: Vehicle spec sheet (Mercedes / BMW style) ---------- */
 function VehicleSpecSheetPdf({ f, item }: { f: Record<string, string>; item: HitlItem }) {
   const oem = f.oem || "Mercedes-Benz";

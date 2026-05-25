@@ -459,7 +459,7 @@ function DatasetsRow({
       const { error: insErr } = await supabase.from("solution_datasets").insert({
         solution_id: solutionId, file_name: file.name, storage_path: path,
         mime_type: file.type || null, file_size: file.size,
-        row_count: rowCount, columns, preview, is_active: true,
+        row_count: rowCount, columns: columns as never, preview: preview as never, is_active: true,
       });
       if (insErr) throw insErr;
       await logActivity(replaceId ? "dataset.replaced" : "dataset.uploaded", solutionId, { file_name: file.name, size: file.size });

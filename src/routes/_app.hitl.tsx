@@ -205,8 +205,8 @@ function ValidationScreen({
   onComplete: () => void;
   onFeedback: (rating: "up" | "down", message: string) => void;
 }) {
-  void sol;
   const sol = getSolution(job.solutionId);
+  void sol;
   const [idx, setIdx] = useState<number>(() => {
     const firstPending = items.findIndex((i) => i.status === "pending");
     return firstPending === -1 ? 0 : firstPending;

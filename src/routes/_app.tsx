@@ -1,21 +1,105 @@
-import { createFileRoute, Outlet, Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Command, ChevronDown, LayoutGrid, Sparkles } from "lucide-react";
+import { createFileRoute, Outlet, Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, useMemo } from "react";
+import { Command as CommandIcon, ChevronDown, LayoutGrid, Sparkles, ClipboardCheck } from "lucide-react";
 import { usePlatform } from "@/store/platform";
+import { SOLUTIONS } from "@/data/solutions";
+import { CAPABILITIES } from "@/data/capabilities";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 export const Route = createFileRoute("/_app")({
   component: AppShell,
 });
 
 function AppShell() {
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background text-foreground">
-      <TopBar />
+      <TopBar onOpenSearch={() => setSearchOpen(true)} />
       <SubNav />
       <main className="flex-1 overflow-y-auto">
         <Outlet />
       </main>
+      <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
     </div>
+  );
+}
+
+function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const navigate = useNavigate();
+  const go = (fn: () => void) => {
+    onOpenChange(false);
+    fn();
+  };
+
+  const staticPages = useMemo(
+    () => [
+      { label: "Solutions", icon: LayoutGrid, action: () => navigate({ to: "/" }) },
+      { label: "Use-cases", icon: Sparkles, action: () => navigate({ to: "/capabilities" }) },
+      { label: "Review · HITL", icon: ClipboardCheck, action: () => navigate({ to: "/hitl" }) },
+    ],
+    [navigate],
+  );
+
+  return (
+    <CommandDialog open={open} onOpenChange={onOpenChange}>
+      <CommandInput placeholder="Search solutions, use-cases, pages…" />
+      <CommandList>
+        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandGroup heading="Pages">
+          {staticPages.map((p) => (
+            <CommandItem key={p.label} value={p.label} onSelect={() => go(p.action)}>
+              <p.icon className="size-4 text-cyan" />
+              <span>{p.label}</span>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+        <CommandGroup heading="Solutions">
+          {SOLUTIONS.map((s) => (
+            <CommandItem
+              key={s.id}
+              value={`solution ${s.title} ${s.code} ${s.short}`}
+              onSelect={() => go(() => navigate({ to: "/solutions/$id", params: { id: s.id } }))}
+            >
+              <s.icon className="size-4 text-cyan" />
+              <span className="flex-1">{s.title}</span>
+              <span className="font-mono text-[10px] text-muted-foreground">{s.code}</span>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+        <CommandGroup heading="Use-cases">
+          {CAPABILITIES.map((c) => (
+            <CommandItem
+              key={c.id}
+              value={`usecase ${c.title} ${c.oneLiner} ${c.customerProfile}`}
+              onSelect={() => go(() => navigate({ to: "/capabilities/$id", params: { id: c.id } }))}
+            >
+              <c.icon className="size-4 text-cyan" />
+              <span className="flex-1">{c.title}</span>
+              <span className="font-mono text-[10px] text-muted-foreground">CASE</span>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </CommandList>
+    </CommandDialog>
   );
 }
 
@@ -25,7 +109,10 @@ function SubNav() {
   const onSolutions = !onUseCases;
   return (
     <div className="h-11 border-b border-border bg-surface/40 flex items-center px-5 gap-3">
-      <div className="flex items-center gap-1 p-0.5 rounded-lg border border-border bg-card shadow-sm">
+      <div className="text-[10px] font-mono text-muted-foreground tracking-widest hidden md:block">
+        {onSolutions ? "ACTIVATE · CONFIGURE · RUN · REVIEW · DELIVER" : "CUSTOMER ENGAGEMENTS · CASE STUDIES"}
+      </div>
+      <div className="ml-auto flex items-center gap-1 p-0.5 rounded-lg border border-border bg-card shadow-sm">
         <Link
           to="/"
           className={`flex items-center gap-1.5 px-3 h-7 rounded-md text-xs font-medium transition ${
@@ -43,14 +130,11 @@ function SubNav() {
           <Sparkles className="size-3.5" /> Use-cases
         </Link>
       </div>
-      <div className="ml-auto text-[10px] font-mono text-muted-foreground tracking-widest hidden md:block">
-        {onSolutions ? "ACTIVATE · CONFIGURE · RUN · REVIEW · DELIVER" : "CUSTOMER ENGAGEMENTS · CASE STUDIES"}
-      </div>
     </div>
   );
 }
 
-function TopBar() {
+function TopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
   const [time, setTime] = useState<string>("");
   const [menuOpen, setMenuOpen] = useState(false);
   const runningJobs = usePlatform((s) => s.jobs.filter((j) => j.status === "running").length);
@@ -81,11 +165,15 @@ function TopBar() {
 
       {/* Search */}
       <div className="flex-1 flex items-center px-5 gap-3">
-        <div className="flex-1 max-w-xl flex items-center gap-2 px-3 h-9 rounded-md border border-border bg-input/60 hover:border-primary/30 transition cursor-text">
-          <Command className="size-3.5 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Search solutions, workflows, jobs…</span>
+        <button
+          type="button"
+          onClick={onOpenSearch}
+          className="flex-1 max-w-xl flex items-center gap-2 px-3 h-9 rounded-md border border-border bg-input/60 hover:border-primary/30 transition cursor-pointer text-left"
+        >
+          <CommandIcon className="size-3.5 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Search solutions, use-cases, pages…</span>
           <kbd className="ml-auto font-mono text-[10px] text-muted-foreground px-1.5 py-0.5 rounded border border-border bg-background/60">⌘K</kbd>
-        </div>
+        </button>
 
         <div className="hidden md:flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground">
           <span className="size-1.5 rounded-full bg-success pulse-dot" />

@@ -274,7 +274,7 @@ function ValidationScreen({
       else if (e.key === "ArrowRight" || e.key === "j") goNext();
       else if (e.key === "ArrowLeft" || e.key === "k") goPrev();
       else if (e.key === "?") setShowShortcuts((v) => !v);
-      else if (e.key === "Escape") { setSelectedField(null); setShowShortcuts(false); }
+      else if (e.key === "Escape") { setSelectedField(null); setShowShortcuts(false); setCtxMenu(null); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

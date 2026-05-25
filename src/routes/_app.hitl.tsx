@@ -287,8 +287,10 @@ function ValidationScreen({
   const completionPct = Math.round(((approved + rejected) / items.length) * 100);
 
   const confTier = (c: number) => (c >= 90 ? "high" : c >= 75 ? "medium" : "low");
+  const tierOf = (f: { name: string; confidence: number }) =>
+    confOverride[`${item.id}:${f.name}`] ?? confTier(f.confidence);
   const filtered = allFields
-    .filter((f) => confidenceFilter === "all" || confTier(f.confidence) === confidenceFilter)
+    .filter((f) => confidenceFilter === "all" || tierOf(f) === confidenceFilter)
     .filter((f) => !fieldQuery || f.name.toLowerCase().includes(fieldQuery.toLowerCase()) || f.value.toLowerCase().includes(fieldQuery.toLowerCase()));
 
   const grouped = useMemo(() => {
@@ -303,9 +305,9 @@ function ValidationScreen({
   }, [filtered]);
 
   const dist = useMemo(() => {
-    const h = allFields.filter((f) => confTier(f.confidence) === "high").length;
-    const m = allFields.filter((f) => confTier(f.confidence) === "medium").length;
-    const l = allFields.filter((f) => confTier(f.confidence) === "low").length;
+    const h = allFields.filter((f) => tierOf(f) === "high").length;
+    const m = allFields.filter((f) => tierOf(f) === "medium").length;
+    const l = allFields.filter((f) => tierOf(f) === "low").length;
     const avg = allFields.length ? Math.round(allFields.reduce((s, f) => s + f.confidence, 0) / allFields.length) : 0;
     return { h, m, l, avg };
   }, [allFields]);

@@ -396,7 +396,18 @@ function ValidationScreen({
             <span className="ml-auto text-[10px] font-mono text-muted-foreground truncate max-w-[160px]">{item.recordName}.{view}</span>
           </div>
 
-          <div className="flex-1 overflow-y-auto bg-[linear-gradient(135deg,oklch(0.96_0.005_220),oklch(0.97_0.008_180))] p-4 relative" ref={lhsRef}>
+          <div
+            className="flex-1 overflow-y-auto bg-[linear-gradient(135deg,oklch(0.96_0.005_220),oklch(0.97_0.008_180))] p-4 relative"
+            ref={lhsRef}
+            onContextMenu={(e) => {
+              const sel = window.getSelection?.();
+              const text = sel?.toString().trim() ?? "";
+              if (!text) return;
+              e.preventDefault();
+              setCtxQuery("");
+              setCtxMenu({ x: e.clientX, y: e.clientY, text });
+            }}
+          >
             <div className="absolute top-3 right-6 z-10 flex flex-col gap-1 text-[9px] font-mono">
               <span className="px-1.5 py-0.5 rounded bg-success/15 border border-success/40 text-success backdrop-blur">● SELECTED</span>
               <span className="px-1.5 py-0.5 rounded bg-amber/15 border border-amber/40 text-amber backdrop-blur">● EXTRACTED</span>

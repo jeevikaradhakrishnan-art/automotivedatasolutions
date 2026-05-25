@@ -12,6 +12,7 @@ import {
   LineChart,
   Building2,
   FileSpreadsheet,
+  Search as Search0Icon,
 } from "lucide-react";
 import { getCapability } from "@/data/capabilities";
 import { DataPreviewTable } from "@/components/solutions/DataPreviewTable";

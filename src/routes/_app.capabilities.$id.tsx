@@ -296,5 +296,4 @@ function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) 
   );
 }
 
-// Local alias so we can reuse Search icon in the workflow without re-importing under a different name conflict
-import { Search as Search0Icon } from "lucide-react";
+

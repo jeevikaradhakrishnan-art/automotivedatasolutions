@@ -636,7 +636,91 @@ function ValidationScreen({
         </div>
       </div>
 
-      {/* Floating confidence analytics removed to keep LHS unobstructed */}
+      {/* ============ Right-click manual annotation menu ============ */}
+      {ctxMenu && (() => {
+        const W = 280, H = 340;
+        const left = Math.min(ctxMenu.x, window.innerWidth - W - 8);
+        const top = Math.min(ctxMenu.y, window.innerHeight - H - 8);
+        const unannotated = allFields.filter((f) => !f.value || !String(f.value).trim());
+        const annotated = allFields.filter((f) => f.value && String(f.value).trim());
+        const q = ctxQuery.toLowerCase();
+        const matches = (f: typeof allFields[number]) => !q || f.name.toLowerCase().includes(q) || (f.group ?? "").toLowerCase().includes(q);
+        const pick = (fname: string) => {
+          handleEdit(fname, ctxMenu.text);
+          setManualAnnot((m) => ({ ...m, [`${item.id}:${fname}`]: true }));
+          pushAudit(`Manually annotated "${fname}" ← "${ctxMenu.text.slice(0, 40)}${ctxMenu.text.length > 40 ? "…" : ""}"`, "success");
+          setCtxMenu(null);
+          setSelectedField(fname);
+        };
+        return (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setCtxMenu(null)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu(null); }} />
+            <div
+              className="fixed z-50 w-[280px] rounded-xl border border-border bg-card/95 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col"
+              style={{ left, top, maxHeight: H }}
+            >
+              <div className="px-3 py-2 border-b border-border bg-gradient-to-r from-cyan/10 to-transparent">
+                <div className="flex items-center gap-1.5 text-[10px] font-mono tracking-widest text-cyan">
+                  <MousePointerClick className="size-3" /> ASSIGN TO ATTRIBUTE
+                </div>
+                <div className="text-[11px] font-mono mt-1 truncate text-foreground" title={ctxMenu.text}>
+                  “{ctxMenu.text}”
+                </div>
+              </div>
+              <div className="p-2 border-b border-border">
+                <div className="relative">
+                  <Search className="size-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    autoFocus
+                    value={ctxQuery}
+                    onChange={(e) => setCtxQuery(e.target.value)}
+                    placeholder="Filter attributes…"
+                    className="w-full h-7 pl-7 pr-2 rounded-md bg-input border border-border text-[11px] font-mono focus:border-cyan/40 outline-none"
+                  />
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto py-1">
+                {unannotated.filter(matches).length > 0 && (
+                  <div className="px-3 py-1 text-[9px] font-mono tracking-widest text-muted-foreground uppercase">Unannotated · suggested</div>
+                )}
+                {unannotated.filter(matches).map((f) => (
+                  <button
+                    key={`u-${f.name}`}
+                    onClick={() => pick(f.name)}
+                    className="w-full text-left px-3 py-1.5 hover:bg-cyan/10 flex items-center gap-2 transition"
+                  >
+                    <Circle className="size-2.5 text-muted-foreground/60 shrink-0" />
+                    <span className="text-[11px] font-mono truncate">{f.name}</span>
+                    <span className="ml-auto text-[9px] font-mono text-muted-foreground">{f.group ?? "fields"}</span>
+                  </button>
+                ))}
+                {annotated.filter(matches).length > 0 && (
+                  <div className="px-3 py-1 mt-1 text-[9px] font-mono tracking-widest text-muted-foreground uppercase border-t border-border">Replace existing</div>
+                )}
+                {annotated.filter(matches).map((f) => (
+                  <button
+                    key={`a-${f.name}`}
+                    onClick={() => pick(f.name)}
+                    className="w-full text-left px-3 py-1.5 hover:bg-amber/10 flex items-center gap-2 transition"
+                  >
+                    <span className="size-2.5 rounded-full bg-success shrink-0" />
+                    <span className="text-[11px] font-mono truncate">{f.name}</span>
+                    <span className="ml-auto text-[9px] font-mono text-muted-foreground truncate max-w-[80px]">{String(f.value)}</span>
+                  </button>
+                ))}
+                {allFields.filter(matches).length === 0 && (
+                  <div className="text-center text-[10px] font-mono text-muted-foreground py-6">No attributes match.</div>
+                )}
+              </div>
+              <div className="px-3 py-1.5 border-t border-border text-[9px] font-mono text-muted-foreground bg-surface/40">
+                Pick an attribute to annotate the selected text · Esc to cancel
+              </div>
+            </div>
+          </>
+        );
+      })()}
+
+
 
 
       {/* ============ Audit trail drawer ============ */}

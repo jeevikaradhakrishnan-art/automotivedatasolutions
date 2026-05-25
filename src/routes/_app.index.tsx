@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SOLUTIONS } from "@/data/solutions";
 import { SolutionCard } from "@/components/solutions/SolutionCard";
+import { useEffectiveSolutions } from "@/hooks/useSolutionOverrides";
 
 export const Route = createFileRoute("/_app/")({ component: SolutionsLanding });
 
 function SolutionsLanding() {
+  const solutions = useEffectiveSolutions();
   return (
     <div className="p-5 space-y-5">
       <div>
@@ -17,7 +18,7 @@ function SolutionsLanding() {
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {SOLUTIONS.map((s) => <SolutionCard key={s.id} s={s} />)}
+        {solutions.map((s) => <SolutionCard key={s.id} s={s} />)}
       </div>
     </div>
   );

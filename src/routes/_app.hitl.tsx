@@ -410,7 +410,8 @@ function ValidationScreen({
           >
             <div className="absolute top-3 right-6 z-10 flex flex-col gap-1 text-[9px] font-mono">
               <span className="px-1.5 py-0.5 rounded bg-success/15 border border-success/40 text-success backdrop-blur">● SELECTED</span>
-              <span className="px-1.5 py-0.5 rounded bg-amber/15 border border-amber/40 text-amber backdrop-blur">● EXTRACTED</span>
+              <span className="px-1.5 py-0.5 rounded bg-amber/15 border border-amber/40 text-amber backdrop-blur">● AUTO-EXTRACTED</span>
+              <span className="px-1.5 py-0.5 rounded bg-card/80 border border-border text-muted-foreground backdrop-blur flex items-center gap-1"><MousePointerClick className="size-2.5" /> RIGHT-CLICK TO ANNOTATE</span>
             </div>
             <div style={{ zoom: `${zoom}%` }} className="transition-all">
               <SourceWithHighlights

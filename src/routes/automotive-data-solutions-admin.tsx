@@ -263,10 +263,9 @@ function AdminConsole() {
 }
 
 async function upsertOverride(solution_id: string, patch: Partial<SolutionOverride>) {
-  // Merge with existing
   const { data: existing } = await supabase.from("solution_overrides").select("*").eq("solution_id", solution_id).maybeSingle();
   const merged = { ...(existing ?? { solution_id, enabled: true }), ...patch, solution_id };
-  const { error } = await supabase.from("solution_overrides").upsert(merged, { onConflict: "solution_id" });
+  const { error } = await supabase.from("solution_overrides").upsert(merged as never, { onConflict: "solution_id" });
   if (error) throw error;
 }
 

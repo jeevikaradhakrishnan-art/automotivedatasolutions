@@ -133,13 +133,15 @@ function SolutionDetail() {
     else downloadFile(`${base}.csv`, toCSV(cols, rows), "text/csv");
   };
 
+  const pendingReview = allJobs.filter((j) => j.solutionId === solution.id && j.status === "review").length;
   const tabs: { id: Tab; label: string; icon: typeof Inbox; show: boolean; badge?: number }[] = [
-    { id: "sources",      label: "Sources",      icon: Globe,     show: true, badge: solution.sources.length },
-    { id: "workflows",    label: "Workflows",    icon: Workflow,  show: true, badge: workflows.length },
-    { id: "jobs",         label: "Jobs",         icon: Inbox,     show: true, badge: jobs.length },
-    { id: "data",         label: "Data",         icon: Database,  show: true },
-    { id: "integrations", label: "Integrations", icon: Send,      show: true },
-    { id: "insights",     label: "Insights",     icon: Sparkles,  show: solution.hasInsights },
+    { id: "sources",      label: "Sources",      icon: Globe,         show: true, badge: solution.sources.length },
+    { id: "workflows",    label: "Workflows",    icon: Workflow,      show: true, badge: workflows.length },
+    { id: "jobs",         label: "Jobs",         icon: Inbox,         show: true, badge: jobs.length },
+    { id: "review",       label: "Review · HITL", icon: ListChecks,   show: true, badge: pendingReview || undefined },
+    { id: "data",         label: "Data",         icon: Database,      show: true },
+    { id: "integrations", label: "Integrations", icon: Send,          show: true },
+    { id: "insights",     label: "Insights",     icon: Sparkles,      show: solution.hasInsights },
   ];
 
 

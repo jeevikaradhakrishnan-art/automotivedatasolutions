@@ -916,6 +916,7 @@ function fieldMap(item: HitlItem): Record<string, string> {
 
 function RealisticHtml({ solutionId, item }: { solutionId: string; item: HitlItem }) {
   const f = fieldMap(item);
+  if (solutionId === "oem-config")    return <OemConfiguratorPage f={f} item={item} />;
   if (solutionId === "vehicle-spec") return <VehicleBrandPage f={f} item={item} />;
   if (solutionId === "news")          return <NewsArticlePage f={f} item={item} />;
   if (solutionId === "ev-charging")   return <EvStationPage  f={f} item={item} />;

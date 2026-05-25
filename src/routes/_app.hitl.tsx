@@ -510,9 +510,10 @@ function ValidationScreen({
                   {!isCollapsed && (
                     <div className="px-2 pb-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {fields.map((f) => {
-                        const tier = confTier(f.confidence);
+                        const cKeyTier = `${item.id}:${f.name}`;
+                        const tier = confOverride[cKeyTier] ?? confTier(f.confidence);
                         const ring = tier === "high" ? "border-l-success" : tier === "medium" ? "border-l-amber" : "border-l-danger";
-                        const chipTone = tier === "high" ? "bg-success/15 text-success border-success/30" : tier === "medium" ? "bg-amber/15 text-amber border-amber/30" : "bg-danger/15 text-danger border-danger/30";
+                        const chipTone = tier === "high" ? "bg-success/15 text-success border-success/40" : tier === "medium" ? "bg-amber/15 text-amber border-amber/40" : "bg-danger/15 text-danger border-danger/40";
                         const isSelected = selectedField === f.name;
                         const cKey = `${item.id}:${f.name}`;
                         const hasComment = !!comments[cKey];

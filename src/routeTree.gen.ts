@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AutomotiveDataSolutionsAdminRouteImport } from './routes/automotive-data-solutions-admin'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppHitlRouteImport } from './routes/_app.hitl'
@@ -19,6 +20,12 @@ import { Route as AppCapabilitiesIndexRouteImport } from './routes/_app.capabili
 import { Route as AppSolutionsIdRouteImport } from './routes/_app.solutions.$id'
 import { Route as AppCapabilitiesIdRouteImport } from './routes/_app.capabilities.$id'
 
+const AutomotiveDataSolutionsAdminRoute =
+  AutomotiveDataSolutionsAdminRouteImport.update({
+    id: '/automotive-data-solutions-admin',
+    path: '/automotive-data-solutions-admin',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
@@ -66,6 +73,7 @@ const AppCapabilitiesIdRoute = AppCapabilitiesIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/automotive-data-solutions-admin': typeof AutomotiveDataSolutionsAdminRoute
   '/admin': typeof AppAdminRoute
   '/capabilities': typeof AppCapabilitiesRouteWithChildren
   '/hitl': typeof AppHitlRoute
@@ -75,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/solutions/': typeof AppSolutionsIndexRoute
 }
 export interface FileRoutesByTo {
+  '/automotive-data-solutions-admin': typeof AutomotiveDataSolutionsAdminRoute
   '/admin': typeof AppAdminRoute
   '/hitl': typeof AppHitlRoute
   '/': typeof AppIndexRoute
@@ -86,6 +95,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/automotive-data-solutions-admin': typeof AutomotiveDataSolutionsAdminRoute
   '/_app/admin': typeof AppAdminRoute
   '/_app/capabilities': typeof AppCapabilitiesRouteWithChildren
   '/_app/hitl': typeof AppHitlRoute
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/automotive-data-solutions-admin'
     | '/admin'
     | '/capabilities'
     | '/hitl'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/solutions/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/automotive-data-solutions-admin'
     | '/admin'
     | '/hitl'
     | '/'
@@ -118,6 +130,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/automotive-data-solutions-admin'
     | '/_app/admin'
     | '/_app/capabilities'
     | '/_app/hitl'
@@ -130,10 +143,18 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
+  AutomotiveDataSolutionsAdminRoute: typeof AutomotiveDataSolutionsAdminRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/automotive-data-solutions-admin': {
+      id: '/automotive-data-solutions-admin'
+      path: '/automotive-data-solutions-admin'
+      fullPath: '/automotive-data-solutions-admin'
+      preLoaderRoute: typeof AutomotiveDataSolutionsAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app': {
       id: '/_app'
       path: ''
@@ -236,6 +257,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
+  AutomotiveDataSolutionsAdminRoute: AutomotiveDataSolutionsAdminRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

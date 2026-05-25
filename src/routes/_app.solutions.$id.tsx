@@ -17,7 +17,7 @@ import { InsightDetailModal } from "@/components/solutions/InsightDetailModal";
 
 export const Route = createFileRoute("/_app/solutions/$id")({ component: SolutionDetail });
 
-type Tab = "sources" | "workflows" | "jobs" | "data" | "integrations" | "insights";
+type Tab = "sources" | "workflows" | "jobs" | "review" | "data" | "integrations" | "insights";
 
 function SolutionDetail() {
   const { id } = Route.useParams();

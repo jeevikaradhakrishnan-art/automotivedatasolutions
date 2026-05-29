@@ -189,52 +189,51 @@ export function WorkflowDiagram({ name, stages }: { name: string; stages: Workfl
           </pattern>
         </defs>
 
-        {/* Top action bar */}
-        <rect x={0} y={0} width={innerW} height={48} fill="#ffffff" />
-        <line x1={0} y1={48} x2={innerW} y2={48} stroke="#e5e7eb" />
-        {/* Title chip */}
-        <text x={18} y={30} fontSize={12} fontWeight={600} fill="#111827" fontFamily="ui-sans-serif, system-ui">
+        {/* Top action bar (compact) */}
+        <rect x={0} y={0} width={innerW} height={32} fill="#ffffff" />
+        <line x1={0} y1={32} x2={innerW} y2={32} stroke="#e5e7eb" />
+        <text x={12} y={20} fontSize={9} fontWeight={600} fill="#111827" fontFamily="ui-sans-serif, system-ui">
           {name}
         </text>
         {/* Breadcrumb */}
-        <g transform={`translate(${innerW / 2 - 110}, 16)`}>
-          <circle cx={0} cy={8} r={8} fill="#22c55e" />
-          <path d="M -3 8 L -1 10 L 4 5" stroke="#fff" strokeWidth={1.6} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          <text x={0} y={32} textAnchor="middle" fontSize={9} fontWeight={600} fill="#22c55e">Design</text>
-          <line x1={12} y1={8} x2={92} y2={8} stroke="#d1d5db" />
-          <g transform="translate(104, 0)">
-            <circle cx={0} cy={8} r={8} fill="none" stroke="#cbd5e1" strokeWidth={1.2} />
-            <text x={0} y={11} textAnchor="middle" fontSize={8} fontWeight={600} fill="#94a3b8">2</text>
-            <text x={0} y={32} textAnchor="middle" fontSize={9} fill="#94a3b8">Prototype</text>
+        <g transform={`translate(${innerW / 2 - 80}, 9)`}>
+          <circle cx={0} cy={6} r={5.5} fill="#2bbf6e" />
+          <path d="M -2 6 L -0.5 7.5 L 2.5 4.5" stroke="#fff" strokeWidth={1.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <text x={0} y={22} textAnchor="middle" fontSize={6.5} fontWeight={600} fill="#2bbf6e">Design</text>
+          <line x1={8} y1={6} x2={68} y2={6} stroke="#d1d5db" />
+          <g transform="translate(76, 0)">
+            <circle cx={0} cy={6} r={5.5} fill="none" stroke="#cbd5e1" strokeWidth={1} />
+            <text x={0} y={8.5} textAnchor="middle" fontSize={6} fontWeight={600} fill="#94a3b8">2</text>
+            <text x={0} y={22} textAnchor="middle" fontSize={6.5} fill="#94a3b8">Prototype</text>
           </g>
-          <line x1={116} y1={8} x2={196} y2={8} stroke="#d1d5db" />
-          <g transform="translate(208, 0)">
-            <circle cx={0} cy={8} r={8} fill="none" stroke="#cbd5e1" strokeWidth={1.2} />
-            <text x={0} y={11} textAnchor="middle" fontSize={8} fontWeight={600} fill="#94a3b8">3</text>
-            <text x={0} y={32} textAnchor="middle" fontSize={9} fill="#94a3b8">Publish</text>
+          <line x1={84} y1={6} x2={144} y2={6} stroke="#d1d5db" />
+          <g transform="translate(152, 0)">
+            <circle cx={0} cy={6} r={5.5} fill="none" stroke="#cbd5e1" strokeWidth={1} />
+            <text x={0} y={8.5} textAnchor="middle" fontSize={6} fontWeight={600} fill="#94a3b8">3</text>
+            <text x={0} y={22} textAnchor="middle" fontSize={6.5} fill="#94a3b8">Publish</text>
           </g>
         </g>
-        {/* Action buttons */}
-        <g transform={`translate(${innerW - 220}, 12)`}>
-          <rect x={0} y={0} width={56} height={22} rx={3} fill="#fff" stroke="#22c55e" />
-          <text x={28} y={15} textAnchor="middle" fontSize={9} fontWeight={700} fill="#22c55e">CLONE</text>
-          <rect x={64} y={0} width={56} height={22} rx={3} fill="#fff" stroke="#22c55e" />
-          <text x={92} y={15} textAnchor="middle" fontSize={9} fontWeight={700} fill="#22c55e">SAVE</text>
-          <rect x={128} y={0} width={92} height={22} rx={3} fill="#22c55e" />
-          <text x={170} y={15} textAnchor="middle" fontSize={9} fontWeight={700} fill="#fff">SAVE &amp; NEXT ›</text>
+        {/* Action buttons (compact) */}
+        <g transform={`translate(${innerW - 148}, 7)`}>
+          <rect x={0} y={0} width={38} height={16} rx={2} fill="#fff" stroke="#2bbf6e" strokeWidth={0.8} />
+          <text x={19} y={11} textAnchor="middle" fontSize={6.5} fontWeight={700} fill="#2bbf6e">CLONE</text>
+          <rect x={42} y={0} width={34} height={16} rx={2} fill="#fff" stroke="#2bbf6e" strokeWidth={0.8} />
+          <text x={59} y={11} textAnchor="middle" fontSize={6.5} fontWeight={700} fill="#2bbf6e">SAVE</text>
+          <rect x={78} y={0} width={64} height={16} rx={2} fill="#2bbf6e" />
+          <text x={110} y={11} textAnchor="middle" fontSize={6.5} fontWeight={700} fill="#fff">SAVE &amp; NEXT ›</text>
         </g>
 
         {/* Canvas */}
-        <rect x={0} y={48} width={innerW} height={height - 48} fill="url(#wf-dots)" />
+        <rect x={0} y={32} width={innerW} height={height - 32} fill="url(#wf-dots)" />
 
-        {/* Zoom controls */}
-        <g transform={`translate(${innerW - 110}, 60)`}>
-          <rect x={0} y={0} width={26} height={22} rx={3} fill="#fff" stroke="#e5e7eb" />
-          <text x={13} y={16} textAnchor="middle" fontSize={12} fill="#6b7280">−</text>
-          <rect x={30} y={0} width={26} height={22} rx={3} fill="#fff" stroke="#e5e7eb" />
-          <text x={43} y={15} textAnchor="middle" fontSize={10} fill="#6b7280">⛶</text>
-          <rect x={60} y={0} width={26} height={22} rx={3} fill="#fff" stroke="#e5e7eb" />
-          <text x={73} y={16} textAnchor="middle" fontSize={12} fill="#6b7280">+</text>
+        {/* Zoom controls (compact) */}
+        <g transform={`translate(${innerW - 70}, 40)`}>
+          <rect x={0} y={0} width={16} height={14} rx={2} fill="#fff" stroke="#e5e7eb" />
+          <text x={8} y={10} textAnchor="middle" fontSize={8} fill="#6b7280">−</text>
+          <rect x={18} y={0} width={16} height={14} rx={2} fill="#fff" stroke="#e5e7eb" />
+          <text x={26} y={10} textAnchor="middle" fontSize={7} fill="#6b7280">⛶</text>
+          <rect x={36} y={0} width={16} height={14} rx={2} fill="#fff" stroke="#e5e7eb" />
+          <text x={44} y={10} textAnchor="middle" fontSize={8} fill="#6b7280">+</text>
         </g>
 
         {/* Orthogonal connectors that route AROUND nodes */}

@@ -355,11 +355,11 @@ function WorkflowCard({ w, onConfigure, onView, onRun }: { w: Wfl; onConfigure: 
       </div>
 
       <div className="flex gap-2 pt-1 flex-wrap">
-        <button onClick={onView} className="h-8 px-3 rounded text-[11px] font-mono border border-border hover:border-cyan/30 hover:text-cyan flex items-center gap-1.5">
-          <Eye className="size-3" /> VIEW WORKFLOW
-        </button>
         <button onClick={onConfigure} className="h-8 px-3 rounded text-[11px] font-mono border border-border hover:border-cyan/30 hover:text-cyan flex items-center gap-1.5">
           <Settings2 className="size-3" /> CONFIGURE
+        </button>
+        <button onClick={onView} className="h-8 px-3 rounded text-[11px] font-mono border border-border hover:border-cyan/30 hover:text-cyan flex items-center gap-1.5">
+          <Eye className="size-3" /> VIEW WORKFLOW
         </button>
         {w.deltaCapable && (
           <button onClick={() => onRun("delta")} className="h-8 px-3 rounded text-[11px] font-mono border border-cyan/30 text-cyan bg-cyan/5 hover:bg-cyan/10 flex items-center gap-1.5">

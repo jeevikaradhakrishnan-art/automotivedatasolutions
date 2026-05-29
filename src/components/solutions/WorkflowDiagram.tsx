@@ -281,8 +281,10 @@ export function WorkflowDiagram({ name, stages }: { name: string; stages: Workfl
           const cy = n.y + NODE / 2;
           return (
             <g key={n.id}>
-              <rect x={n.x} y={n.y} width={NODE} height={NODE} rx={5} ry={5} fill={fill} />
-              <NodeIcon kind={n.kind} cx={cx} cy={cy} />
+              <rect x={n.x} y={n.y} width={NODE} height={NODE} rx={4} ry={4} fill={fill} />
+              <g transform={`translate(${cx}, ${cy}) scale(0.65)`}>
+                <NodeIcon kind={n.kind} cx={0} cy={0} />
+              </g>
               <g>
                 <rect
                   x={n.x - 20}

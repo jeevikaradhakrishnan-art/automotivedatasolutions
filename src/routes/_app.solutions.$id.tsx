@@ -291,6 +291,7 @@ function WorkflowsTab({
   onRun: (workflow: Wfl, mode: "full" | "delta", sources: string[]) => void;
 }) {
   const [configuring, setConfiguring] = useState<Wfl | null>(null);
+  const [viewing, setViewing] = useState<Wfl | null>(null);
 
   if (workflows.length === 0) {
     return <div className="panel p-6 text-sm text-muted-foreground">No workflows defined.</div>;
@@ -304,7 +305,13 @@ function WorkflowsTab({
       </div>
       <div className="grid lg:grid-cols-2 gap-3">
         {workflows.map((w) => (
-          <WorkflowCard key={w.id} w={w} onConfigure={() => setConfiguring(w)} onRun={(mode) => onRun(w, mode, solutionSources)} />
+          <WorkflowCard
+            key={w.id}
+            w={w}
+            onConfigure={() => setConfiguring(w)}
+            onView={() => setViewing(w)}
+            onRun={(mode) => onRun(w, mode, solutionSources)}
+          />
         ))}
       </div>
       {configuring && (
@@ -312,12 +319,14 @@ function WorkflowsTab({
           workflow={configuring}
           solutionSources={solutionSources}
           onClose={() => setConfiguring(null)}
+          onView={() => setViewing(configuring)}
           onRun={(mode, picked) => {
             onRun(configuring, mode, picked);
             setConfiguring(null);
           }}
         />
       )}
+      {viewing && <WorkflowPreviewModal workflow={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }

@@ -285,20 +285,21 @@ export function WorkflowDiagram({ name, stages }: { name: string; stages: Workfl
               <NodeIcon kind={n.kind} cx={cx} cy={cy} />
               <g>
                 <rect
-                  x={n.x - 28}
-                  y={n.y + NODE + 6}
-                  width={NODE + 56}
-                  height={18}
-                  rx={2.5}
-                  ry={2.5}
+                  x={n.x - 20}
+                  y={n.y + NODE + 4}
+                  width={NODE + 40}
+                  height={12}
+                  rx={2}
+                  ry={2}
                   fill="#ffffff"
                   stroke="#e5e7eb"
+                  strokeWidth={0.6}
                 />
                 <text
                   x={cx}
-                  y={n.y + NODE + 18}
+                  y={n.y + NODE + 12}
                   textAnchor="middle"
-                  fontSize={8.5}
+                  fontSize={6}
                   fontFamily="ui-sans-serif, system-ui"
                   fill="#374151"
                 >

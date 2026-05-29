@@ -1,23 +1,16 @@
 import type { WorkflowStage } from "@/store/platform";
 
 /**
- * Renders a workflow pipeline as a node-graph that visually replicates the
- * reference workflow designer screenshots (S&P Mobility / Multi-Source PEP):
- *   - dotted off-white canvas
- *   - green Input/Output squares with download/upload chevrons
- *   - blue bot squares with a white robot icon
- *   - teal ETL squares (Union All / Filter) for transforms
- *   - purple Production document + purple QC/QA shields
- *   - curved gray connectors with dot endpoints
- *   - white label chips below every node
- *   - right-hand chrome rail (BOTS / ETL / HITL / SOLUTIONS / INTEGRATION)
- *   - top breadcrumb (Design / Prototype / Publish)
- *
- * Each stage is expanded into multiple sub-nodes so even short pipelines look
- * dense and "real" — matching the reference's visual complexity.
+ * SVG workflow diagram that visually replicates the reference PEP designer
+ * screenshots: small rounded-square nodes (blue bots, teal ETL, purple
+ * production/QC, green I/O), white label chips beneath each node, thin gray
+ * ORTHOGONAL connectors with dot endpoints that route AROUND nodes (never
+ * through them), a dotted off-white canvas, a top action bar (Design /
+ * Prototype / Publish + CLONE / SAVE / SAVE & NEXT), and a vertical right
+ * rail (search, BOTS, ETL, HITL, SOLUTIONS).
  */
 
-type NodeKind = "input" | "output" | "bot" | "etl" | "production" | "qc" | "qa";
+type NodeKind = "input" | "output" | "bot" | "etl-union" | "etl-filter" | "production" | "qc" | "qa";
 
 interface DiagramNode {
   id: string;
@@ -25,178 +18,163 @@ interface DiagramNode {
   kind: NodeKind;
 }
 
-/** Expand a single workflow stage into multiple sub-nodes for visual density. */
 function expandStage(stage: WorkflowStage, idx: number): DiagramNode[] {
   const baseId = `s${idx}`;
-  const short = stage.name.length > 22 ? stage.name.slice(0, 20) + "…" : stage.name;
+  const short = (s: string) => (s.length > 22 ? s.slice(0, 20) + "…" : s);
+  const name = short(stage.name);
   switch (stage.kind) {
     case "aggregate":
       return [
-        { id: `${baseId}-a1`, label: "Source Crawler", kind: "bot" },
-        { id: `${baseId}-a2`, label: short, kind: "bot" },
-        { id: `${baseId}-a3`, label: "Input Analyzer", kind: "bot" },
+        { id: `${baseId}-a1`, label: "Source Crawler",  kind: "bot" },
+        { id: `${baseId}-a2`, label: name,              kind: "bot" },
+        { id: `${baseId}-a3`, label: "Input Analyzer",  kind: "bot" },
       ];
     case "transform":
       return [
-        { id: `${baseId}-t1`, label: "Pre Processing", kind: "bot" },
-        { id: `${baseId}-t2`, label: "Union All", kind: "etl" },
-        { id: `${baseId}-t3`, label: short, kind: "bot" },
+        { id: `${baseId}-t1`, label: "Pre Processing",  kind: "bot" },
+        { id: `${baseId}-t2`, label: "Union All",       kind: "etl-union" },
+        { id: `${baseId}-t3`, label: name,              kind: "bot" },
       ];
     case "enrich":
       return [
-        { id: `${baseId}-e1`, label: "LLM Pre Processing", kind: "bot" },
-        { id: `${baseId}-e2`, label: short, kind: "bot" },
-        { id: `${baseId}-e3`, label: "Audit LLM", kind: "bot" },
+        { id: `${baseId}-e1`, label: "LLM Pre Processing",  kind: "bot" },
+        { id: `${baseId}-e2`, label: name,                  kind: "bot" },
+        { id: `${baseId}-e3`, label: "Audit LLM",           kind: "bot" },
         { id: `${baseId}-e4`, label: "LLM Post Processing", kind: "bot" },
       ];
     case "delta":
       return [
-        { id: `${baseId}-d1`, label: "Filter", kind: "etl" },
-        { id: `${baseId}-d2`, label: short, kind: "bot" },
+        { id: `${baseId}-d1`, label: "Filter", kind: "etl-filter" },
+        { id: `${baseId}-d2`, label: name,     kind: "bot" },
       ];
     case "qa":
       return [
-        { id: `${baseId}-q1`, label: "Production", kind: "production" },
-        { id: `${baseId}-q2`, label: "QC", kind: "qc" },
-        { id: `${baseId}-q3`, label: "QA", kind: "qa" },
+        { id: `${baseId}-q1`, label: "Production",    kind: "production" },
+        { id: `${baseId}-q2`, label: "Validation - QC", kind: "qc" },
       ];
     case "deliver":
-      return [
-        { id: `${baseId}-r1`, label: "Output Transformation", kind: "bot" },
-      ];
+      return [{ id: `${baseId}-r1`, label: "Output Transformation", kind: "bot" }];
     default:
-      return [{ id: baseId, label: short, kind: "bot" }];
+      return [{ id: baseId, label: name, kind: "bot" }];
   }
 }
 
-const COLORS: Record<NodeKind, string> = {
-  input:      "#10b981",
-  output:     "#10b981",
-  bot:        "#5b8def",
-  etl:        "#14b8a6",
-  production: "#a78bfa",
-  qc:         "#a78bfa",
-  qa:         "#a78bfa",
+const COLOR: Record<NodeKind, string> = {
+  input:        "#22c55e",
+  output:       "#22c55e",
+  bot:          "#4f9cf9",
+  "etl-union":  "#2ec4b6",
+  "etl-filter": "#2ec4b6",
+  production:   "#a78bfa",
+  qc:           "#a78bfa",
+  qa:           "#a78bfa",
 };
 
-/** Inline SVG icons rendered inside each node, mimicking the reference. */
 function NodeIcon({ kind, cx, cy }: { kind: NodeKind; cx: number; cy: number }) {
-  const s = 18; // half-extent
   switch (kind) {
     case "input":
       return (
-        <g stroke="#fff" strokeWidth={2.4} fill="none" strokeLinecap="round" strokeLinejoin="round">
-          <path d={`M ${cx} ${cy - s + 4} L ${cx} ${cy + s - 8}`} />
-          <path d={`M ${cx - 7} ${cy + s - 14} L ${cx} ${cy + s - 8} L ${cx + 7} ${cy + s - 14}`} />
-          <path d={`M ${cx - 10} ${cy + s - 2} L ${cx + 10} ${cy + s - 2}`} />
+        <g stroke="#fff" strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round">
+          <path d={`M ${cx} ${cy - 8} L ${cx} ${cy + 3}`} />
+          <path d={`M ${cx - 4} ${cy - 1} L ${cx} ${cy + 3} L ${cx + 4} ${cy - 1}`} />
+          <path d={`M ${cx - 6} ${cy + 7} L ${cx + 6} ${cy + 7}`} />
         </g>
       );
     case "output":
       return (
-        <g stroke="#fff" strokeWidth={2.4} fill="none" strokeLinecap="round" strokeLinejoin="round">
-          <path d={`M ${cx} ${cy + s - 8} L ${cx} ${cy - s + 6}`} />
-          <path d={`M ${cx - 7} ${cy - s + 12} L ${cx} ${cy - s + 6} L ${cx + 7} ${cy - s + 12}`} />
-          <path d={`M ${cx - 10} ${cy + s - 2} L ${cx + 10} ${cy + s - 2}`} />
+        <g stroke="#fff" strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round">
+          <path d={`M ${cx} ${cy + 3} L ${cx} ${cy - 8}`} />
+          <path d={`M ${cx - 4} ${cy - 4} L ${cx} ${cy - 8} L ${cx + 4} ${cy - 4}`} />
+          <path d={`M ${cx - 6} ${cy + 7} L ${cx + 6} ${cy + 7}`} />
         </g>
       );
     case "bot":
       return (
         <g fill="#fff">
-          {/* antenna */}
-          <circle cx={cx} cy={cy - 14} r={1.6} />
-          <rect x={cx - 0.6} y={cy - 13} width={1.2} height={4} />
-          {/* head */}
-          <rect x={cx - 11} y={cy - 9} width={22} height={16} rx={3} />
-          {/* eyes */}
-          <circle cx={cx - 4} cy={cy - 1} r={1.6} fill="#5b8def" />
-          <circle cx={cx + 4} cy={cy - 1} r={1.6} fill="#5b8def" />
-          {/* mouth */}
-          <rect x={cx - 5} y={cy + 3} width={10} height={1.6} rx={0.8} fill="#5b8def" />
-          {/* base */}
-          <rect x={cx - 8} y={cy + 8} width={16} height={3} rx={1} />
+          <circle cx={cx} cy={cy - 9} r={1} />
+          <rect x={cx - 0.4} y={cy - 8.5} width={0.8} height={2.5} />
+          <rect x={cx - 7} y={cy - 6} width={14} height={10} rx={2} />
+          <circle cx={cx - 2.5} cy={cy - 1} r={1} fill="#4f9cf9" />
+          <circle cx={cx + 2.5} cy={cy - 1} r={1} fill="#4f9cf9" />
+          <rect x={cx - 3} y={cy + 1.5} width={6} height={1} rx={0.5} fill="#4f9cf9" />
+          <rect x={cx - 5} y={cy + 5} width={10} height={2} rx={0.6} />
         </g>
       );
-    case "etl":
+    case "etl-union":
       return (
-        <g fill="#fff" stroke="#fff" strokeWidth={1.6}>
-          <circle cx={cx - 5} cy={cy - 3} r={5} fill="none" />
-          <circle cx={cx + 5} cy={cy + 3} r={5} fill="none" />
+        <g fill="none" stroke="#fff" strokeWidth={1.6}>
+          <rect x={cx - 6} y={cy - 6} width={8} height={8} rx={1.2} />
+          <rect x={cx - 2} y={cy - 2} width={8} height={8} rx={1.2} />
+        </g>
+      );
+    case "etl-filter":
+      return (
+        <g fill="#fff" stroke="#fff" strokeWidth={1.4} strokeLinejoin="round">
+          <path d={`M ${cx - 7} ${cy - 6} L ${cx + 7} ${cy - 6} L ${cx + 1.5} ${cy + 1} L ${cx + 1.5} ${cy + 7} L ${cx - 1.5} ${cy + 5} L ${cx - 1.5} ${cy + 1} Z`} />
         </g>
       );
     case "production":
       return (
         <g fill="#fff">
-          <rect x={cx - 9} y={cy - 10} width={18} height={20} rx={1.5} />
-          <rect x={cx - 6} y={cy - 6} width={12} height={1.5} fill="#a78bfa" />
-          <rect x={cx - 6} y={cy - 2} width={12} height={1.5} fill="#a78bfa" />
-          <rect x={cx - 6} y={cy + 2} width={8}  height={1.5} fill="#a78bfa" />
+          <rect x={cx - 6} y={cy - 7} width={12} height={14} rx={1.2} />
+          <rect x={cx - 4} y={cy - 4} width={8} height={1.2} fill="#a78bfa" />
+          <rect x={cx - 4} y={cy - 1} width={8} height={1.2} fill="#a78bfa" />
+          <rect x={cx - 4} y={cy + 2} width={5} height={1.2} fill="#a78bfa" />
         </g>
       );
     case "qc":
     case "qa":
       return (
         <g fill="#fff">
-          {/* shield */}
           <path
-            d={`M ${cx} ${cy - 11}
-                L ${cx + 9} ${cy - 7}
-                L ${cx + 9} ${cy + 2}
-                Q ${cx + 9} ${cy + 9}, ${cx} ${cy + 12}
-                Q ${cx - 9} ${cy + 9}, ${cx - 9} ${cy + 2}
-                L ${cx - 9} ${cy - 7} Z`}
+            d={`M ${cx} ${cy - 8}
+                L ${cx + 6} ${cy - 5}
+                L ${cx + 6} ${cy + 1}
+                Q ${cx + 6} ${cy + 6}, ${cx} ${cy + 8}
+                Q ${cx - 6} ${cy + 6}, ${cx - 6} ${cy + 1}
+                L ${cx - 6} ${cy - 5} Z`}
           />
-          {kind === "qc" ? (
-            <path
-              d={`M ${cx - 4} ${cy + 1} L ${cx - 1} ${cy + 4} L ${cx + 5} ${cy - 3}`}
-              stroke="#a78bfa" strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round"
-            />
-          ) : (
-            <text x={cx} y={cy + 3.5} textAnchor="middle" fontSize={8} fontWeight={700} fill="#a78bfa">QA</text>
-          )}
+          <path
+            d={`M ${cx - 2.5} ${cy + 0.5} L ${cx - 0.5} ${cy + 2.5} L ${cx + 3} ${cy - 1.5}`}
+            stroke="#a78bfa" strokeWidth={1.4} fill="none" strokeLinecap="round" strokeLinejoin="round"
+          />
         </g>
       );
   }
 }
 
 export function WorkflowDiagram({ name, stages }: { name: string; stages: WorkflowStage[] }) {
-  // Build expanded node list: Input → all stage expansions → Output
   const nodes: DiagramNode[] = [
     { id: "input", label: "Input", kind: "input" },
     ...stages.flatMap((s, i) => expandStage(s, i)),
     { id: "output", label: "Output", kind: "output" },
   ];
 
-  // Snake layout
+  // Layout constants
+  const NODE = 40;
+  const GAP_X = 64;
+  const GAP_Y = 90;
+  const PAD_X = 70;
+  const PAD_TOP = 80;
+  const RAIL_W = 56;
   const PER_ROW = 6;
-  const NODE = 52;
-  const GAP_X = 60;
-  const GAP_Y = 100;
-  const PAD_X = 64;
-  const PAD_Y = 80;
-  const RAIL_W = 64;
 
+  const rows = Math.ceil(nodes.length / PER_ROW);
+
+  // Snake layout: even rows L→R, odd rows R→L
   const positioned = nodes.map((n, i) => {
     const row = Math.floor(i / PER_ROW);
     const colInRow = i % PER_ROW;
     const reversed = row % 2 === 1;
     const col = reversed ? PER_ROW - 1 - colInRow : colInRow;
     const x = PAD_X + col * (NODE + GAP_X);
-    const y = PAD_Y + row * (NODE + GAP_Y);
-    return { ...n, x, y, row, col };
+    const y = PAD_TOP + row * (NODE + GAP_Y);
+    return { ...n, x, y, row, col, reversed };
   });
 
-  const rows = Math.ceil(nodes.length / PER_ROW);
   const innerW = PAD_X * 2 + PER_ROW * NODE + (PER_ROW - 1) * GAP_X;
   const width = innerW + RAIL_W;
-  const height = PAD_Y + rows * NODE + (rows - 1) * GAP_Y + 80;
-
-  const railIcons = [
-    { label: "BOTS",        color: "#5b8def", glyph: "🤖" },
-    { label: "ETL",         color: "#14b8a6", glyph: "⥃"  },
-    { label: "HITL",        color: "#a78bfa", glyph: "👥" },
-    { label: "SOLUTIONS",   color: "#f59e0b", glyph: "✦"  },
-    { label: "INTEGRATION", color: "#3b82f6", glyph: "⚙"  },
-  ];
+  const height = PAD_TOP + rows * NODE + (rows - 1) * GAP_Y + 70;
 
   return (
     <div className="w-full overflow-x-auto bg-[#f5f6f8] rounded-md border border-border">
@@ -206,133 +184,153 @@ export function WorkflowDiagram({ name, stages }: { name: string; stages: Workfl
         preserveAspectRatio="xMidYMid meet"
       >
         <defs>
-          <pattern id="wf-dots" width="14" height="14" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1" fill="#d1d5db" />
+          <pattern id="wf-dots" width="12" height="12" patternUnits="userSpaceOnUse">
+            <circle cx="1.5" cy="1.5" r="0.7" fill="#d1d5db" />
           </pattern>
-          <filter id="wf-shadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="1" stdDeviation="1.2" floodColor="#000" floodOpacity="0.12" />
-          </filter>
         </defs>
-        <rect width={innerW} height={height} fill="url(#wf-dots)" />
 
-        {/* Top breadcrumb chrome */}
-        <g transform={`translate(${innerW / 2 - 130}, 18)`}>
-          <g>
-            <circle cx={0} cy={10} r={9} fill="#10b981" />
-            <path d="M -4 10 L -1 13 L 5 7" stroke="#fff" strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            <text x={0} y={36} textAnchor="middle" fontSize={9} fontWeight={600} fill="#10b981">Design</text>
+        {/* Top action bar */}
+        <rect x={0} y={0} width={innerW} height={48} fill="#ffffff" />
+        <line x1={0} y1={48} x2={innerW} y2={48} stroke="#e5e7eb" />
+        {/* Title chip */}
+        <text x={18} y={30} fontSize={12} fontWeight={600} fill="#111827" fontFamily="ui-sans-serif, system-ui">
+          {name}
+        </text>
+        {/* Breadcrumb */}
+        <g transform={`translate(${innerW / 2 - 110}, 16)`}>
+          <circle cx={0} cy={8} r={8} fill="#22c55e" />
+          <path d="M -3 8 L -1 10 L 4 5" stroke="#fff" strokeWidth={1.6} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <text x={0} y={32} textAnchor="middle" fontSize={9} fontWeight={600} fill="#22c55e">Design</text>
+          <line x1={12} y1={8} x2={92} y2={8} stroke="#d1d5db" />
+          <g transform="translate(104, 0)">
+            <circle cx={0} cy={8} r={8} fill="none" stroke="#cbd5e1" strokeWidth={1.2} />
+            <text x={0} y={11} textAnchor="middle" fontSize={8} fontWeight={600} fill="#94a3b8">2</text>
+            <text x={0} y={32} textAnchor="middle" fontSize={9} fill="#94a3b8">Prototype</text>
           </g>
-          <line x1={14} y1={10} x2={106} y2={10} stroke="#d1d5db" strokeWidth={1} />
-          <g transform="translate(120, 0)">
-            <circle cx={0} cy={10} r={9} fill="none" stroke="#cbd5e1" strokeWidth={1.4} />
-            <text x={0} y={13} textAnchor="middle" fontSize={9} fontWeight={600} fill="#94a3b8">2</text>
-            <text x={0} y={36} textAnchor="middle" fontSize={9} fill="#94a3b8">Prototype</text>
-          </g>
-          <line x1={134} y1={10} x2={226} y2={10} stroke="#d1d5db" strokeWidth={1} />
-          <g transform="translate(240, 0)">
-            <circle cx={0} cy={10} r={9} fill="none" stroke="#cbd5e1" strokeWidth={1.4} />
-            <text x={0} y={13} textAnchor="middle" fontSize={9} fontWeight={600} fill="#94a3b8">3</text>
-            <text x={0} y={36} textAnchor="middle" fontSize={9} fill="#94a3b8">Publish</text>
+          <line x1={116} y1={8} x2={196} y2={8} stroke="#d1d5db" />
+          <g transform="translate(208, 0)">
+            <circle cx={0} cy={8} r={8} fill="none" stroke="#cbd5e1" strokeWidth={1.2} />
+            <text x={0} y={11} textAnchor="middle" fontSize={8} fontWeight={600} fill="#94a3b8">3</text>
+            <text x={0} y={32} textAnchor="middle" fontSize={9} fill="#94a3b8">Publish</text>
           </g>
         </g>
-
-        {/* Title chip top-left */}
-        <g>
-          <rect x={14} y={14} rx={4} ry={4} width={Math.min(name.length * 6.5 + 28, innerW / 2)} height={26} fill="#ffffff" stroke="#e5e7eb" />
-          <text x={26} y={31} fontFamily="ui-sans-serif, system-ui" fontSize={11} fontWeight={600} fill="#374151">
-            {name}
-          </text>
+        {/* Action buttons */}
+        <g transform={`translate(${innerW - 220}, 12)`}>
+          <rect x={0} y={0} width={56} height={22} rx={3} fill="#fff" stroke="#22c55e" />
+          <text x={28} y={15} textAnchor="middle" fontSize={9} fontWeight={700} fill="#22c55e">CLONE</text>
+          <rect x={64} y={0} width={56} height={22} rx={3} fill="#fff" stroke="#22c55e" />
+          <text x={92} y={15} textAnchor="middle" fontSize={9} fontWeight={700} fill="#22c55e">SAVE</text>
+          <rect x={128} y={0} width={92} height={22} rx={3} fill="#22c55e" />
+          <text x={170} y={15} textAnchor="middle" fontSize={9} fontWeight={700} fill="#fff">SAVE &amp; NEXT ›</text>
         </g>
 
-        {/* Connectors */}
+        {/* Canvas */}
+        <rect x={0} y={48} width={innerW} height={height - 48} fill="url(#wf-dots)" />
+
+        {/* Zoom controls */}
+        <g transform={`translate(${innerW - 110}, 60)`}>
+          <rect x={0} y={0} width={26} height={22} rx={3} fill="#fff" stroke="#e5e7eb" />
+          <text x={13} y={16} textAnchor="middle" fontSize={12} fill="#6b7280">−</text>
+          <rect x={30} y={0} width={26} height={22} rx={3} fill="#fff" stroke="#e5e7eb" />
+          <text x={43} y={15} textAnchor="middle" fontSize={10} fill="#6b7280">⛶</text>
+          <rect x={60} y={0} width={26} height={22} rx={3} fill="#fff" stroke="#e5e7eb" />
+          <text x={73} y={16} textAnchor="middle" fontSize={12} fill="#6b7280">+</text>
+        </g>
+
+        {/* Orthogonal connectors that route AROUND nodes */}
         {positioned.slice(0, -1).map((n, i) => {
           const next = positioned[i + 1];
           const sameRow = n.row === next.row;
-          const cxStart = n.x + NODE;
-          const cyStart = n.y + NODE / 2;
-          const cxEnd = next.x;
-          const cyEnd = next.y + NODE / 2;
+          const dir = n.reversed ? -1 : 1; // travel direction along the row
+          const startX = n.x + (dir === 1 ? NODE : 0);
+          const startY = n.y + NODE / 2;
+          const endX = next.x + (dir === 1 ? 0 : NODE);
+          const endY = next.y + NODE / 2;
 
           let path: string;
           if (sameRow) {
-            const midX = (cxStart + cxEnd) / 2;
-            path = `M ${cxStart} ${cyStart} C ${midX} ${cyStart}, ${midX} ${cyEnd}, ${cxEnd} ${cyEnd}`;
+            // straight short hop
+            path = `M ${startX} ${startY} L ${endX} ${endY}`;
           } else {
-            // wrap to next row: exit right edge, drop down, re-enter
-            const outX = innerW - 30;
-            const dropY = (cyStart + cyEnd) / 2;
+            // wrap to next row: exit horizontally past the row edge, drop down
+            // through the LABEL GAP (between this row's labels and the next row's
+            // nodes), then come back horizontally to the next node.
+            const edgeX = dir === 1 ? startX + GAP_X / 2 : startX - GAP_X / 2;
+            const dropY = n.y + NODE + 44; // below this row's label chip
             path =
-              `M ${cxStart} ${cyStart} ` +
-              `C ${outX - 30} ${cyStart}, ${outX} ${cyStart}, ${outX} ${dropY} ` +
-              `C ${outX} ${cyEnd}, ${next.x - 30} ${cyEnd}, ${cxEnd} ${cyEnd}`;
+              `M ${startX} ${startY} ` +
+              `L ${edgeX} ${startY} ` +
+              `L ${edgeX} ${dropY} ` +
+              `L ${endX + (dir === 1 ? -GAP_X / 2 : GAP_X / 2)} ${dropY} ` +
+              `L ${endX + (dir === 1 ? -GAP_X / 2 : GAP_X / 2)} ${endY} ` +
+              `L ${endX} ${endY}`;
           }
+
           return (
             <g key={`c-${i}`}>
-              <path d={path} stroke="#9ca3af" strokeWidth={1.4} fill="none" />
-              <circle cx={cxStart} cy={cyStart} r={2.6} fill="#4b5563" />
-              <circle cx={cxEnd}   cy={cyEnd}   r={2.6} fill="#4b5563" />
+              <path d={path} stroke="#9ca3af" strokeWidth={1.1} fill="none" />
+              <circle cx={startX} cy={startY} r={2} fill="#4b5563" />
+              <circle cx={endX}   cy={endY}   r={2} fill="#4b5563" />
             </g>
           );
         })}
 
-        {/* Nodes */}
+        {/* Nodes (drawn AFTER connectors so they sit on top, never under) */}
         {positioned.map((n) => {
-          const fill = COLORS[n.kind];
+          const fill = COLOR[n.kind];
           const cx = n.x + NODE / 2;
           const cy = n.y + NODE / 2;
           return (
             <g key={n.id}>
-              <rect
-                x={n.x}
-                y={n.y}
-                width={NODE}
-                height={NODE}
-                rx={8}
-                ry={8}
-                fill={fill}
-                filter="url(#wf-shadow)"
-              />
+              <rect x={n.x} y={n.y} width={NODE} height={NODE} rx={5} ry={5} fill={fill} />
               <NodeIcon kind={n.kind} cx={cx} cy={cy} />
-              {/* label chip */}
               <g>
                 <rect
-                  x={n.x - 22}
-                  y={n.y + NODE + 8}
-                  width={NODE + 44}
-                  height={22}
-                  rx={3}
-                  ry={3}
+                  x={n.x - 28}
+                  y={n.y + NODE + 6}
+                  width={NODE + 56}
+                  height={18}
+                  rx={2.5}
+                  ry={2.5}
                   fill="#ffffff"
                   stroke="#e5e7eb"
                 />
                 <text
                   x={cx}
-                  y={n.y + NODE + 23}
+                  y={n.y + NODE + 18}
                   textAnchor="middle"
-                  fontSize={9.5}
+                  fontSize={8.5}
                   fontFamily="ui-sans-serif, system-ui"
                   fill="#374151"
                 >
-                  {n.label.length > 22 ? n.label.slice(0, 20) + "…" : n.label}
+                  {n.label}
                 </text>
               </g>
             </g>
           );
         })}
 
-        {/* Right-hand chrome rail */}
+        {/* Right rail */}
         <g transform={`translate(${innerW}, 0)`}>
           <rect x={0} y={0} width={RAIL_W} height={height} fill="#ffffff" stroke="#e5e7eb" />
           {/* search */}
-          <g transform="translate(32, 30)">
-            <circle cx={0} cy={0} r={7} fill="none" stroke="#94a3b8" strokeWidth={1.4} />
-            <line x1={5} y1={5} x2={10} y2={10} stroke="#94a3b8" strokeWidth={1.4} />
+          <g transform="translate(28, 64)">
+            <circle cx={0} cy={0} r={6} fill="none" stroke="#94a3b8" strokeWidth={1.2} />
+            <line x1={4} y1={4} x2={9} y2={9} stroke="#94a3b8" strokeWidth={1.2} />
           </g>
-          {railIcons.map((r, i) => (
-            <g key={r.label} transform={`translate(32, ${72 + i * 56})`}>
-              <rect x={-14} y={-12} width={28} height={24} rx={4} fill={`${r.color}15`} />
-              <text x={0} y={4} textAnchor="middle" fontSize={14} fill={r.color}>{r.glyph}</text>
-              <text x={0} y={22} textAnchor="middle" fontSize={7} fontWeight={700} fill={r.color} letterSpacing={0.5}>
+          {[
+            { label: "BOTS",      color: "#4f9cf9", kind: "bot" as const },
+            { label: "ETL",       color: "#2ec4b6", kind: "etl-union" as const },
+            { label: "HITL",      color: "#a78bfa", kind: "qc" as const },
+            { label: "SOLUTIONS", color: "#f59e0b", kind: "production" as const },
+          ].map((r, i) => (
+            <g key={r.label} transform={`translate(28, ${110 + i * 56})`}>
+              <rect x={-12} y={-12} width={24} height={24} rx={3} fill={r.color} />
+              <g transform="translate(0,0)">
+                {/* tiny icon centered */}
+                <NodeIcon kind={r.kind} cx={0} cy={0} />
+              </g>
+              <text x={0} y={22} textAnchor="middle" fontSize={7} fontWeight={700} fill={r.color} letterSpacing={0.4}>
                 {r.label}
               </text>
             </g>

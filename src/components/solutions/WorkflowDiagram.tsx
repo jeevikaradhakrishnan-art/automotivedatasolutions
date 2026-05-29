@@ -328,7 +328,7 @@ export function WorkflowDiagram({ name, stages }: { name: string; stages: Workfl
           ].map((r, i) => (
             <g key={r.label} transform={`translate(${RAIL_W / 2}, ${74 + i * 38})`}>
               <rect x={-8} y={-8} width={16} height={16} rx={2.5} fill={r.color} />
-              <NodeIcon kind={r.kind} cx={0} cy={0} />
+              <g transform="scale(0.55)"><NodeIcon kind={r.kind} cx={0} cy={0} /></g>
               <text x={0} y={16} textAnchor="middle" fontSize={5.5} fontWeight={700} fill={r.color} letterSpacing={0.3}>
                 {r.label}
               </text>

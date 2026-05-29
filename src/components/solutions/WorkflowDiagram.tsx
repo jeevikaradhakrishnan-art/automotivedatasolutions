@@ -151,13 +151,13 @@ export function WorkflowDiagram({ name, stages }: { name: string; stages: Workfl
   ];
 
   // Layout constants
-  const NODE = 40;
-  const GAP_X = 64;
-  const GAP_Y = 90;
-  const PAD_X = 70;
-  const PAD_TOP = 80;
-  const RAIL_W = 56;
-  const PER_ROW = 6;
+  const NODE = 28;
+  const GAP_X = 56;
+  const GAP_Y = 70;
+  const PAD_X = 60;
+  const PAD_TOP = 64;
+  const RAIL_W = 42;
+  const PER_ROW = 7;
 
   const rows = Math.ceil(nodes.length / PER_ROW);
 

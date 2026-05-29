@@ -310,27 +310,24 @@ export function WorkflowDiagram({ name, stages }: { name: string; stages: Workfl
           );
         })}
 
-        {/* Right rail */}
+        {/* Right rail (compact) */}
         <g transform={`translate(${innerW}, 0)`}>
           <rect x={0} y={0} width={RAIL_W} height={height} fill="#ffffff" stroke="#e5e7eb" />
           {/* search */}
-          <g transform="translate(28, 64)">
-            <circle cx={0} cy={0} r={6} fill="none" stroke="#94a3b8" strokeWidth={1.2} />
-            <line x1={4} y1={4} x2={9} y2={9} stroke="#94a3b8" strokeWidth={1.2} />
+          <g transform={`translate(${RAIL_W / 2}, 44)`}>
+            <circle cx={0} cy={0} r={4} fill="none" stroke="#94a3b8" strokeWidth={1} />
+            <line x1={2.8} y1={2.8} x2={6} y2={6} stroke="#94a3b8" strokeWidth={1} />
           </g>
           {[
-            { label: "BOTS",      color: "#4f9cf9", kind: "bot" as const },
-            { label: "ETL",       color: "#2ec4b6", kind: "etl-union" as const },
-            { label: "HITL",      color: "#a78bfa", kind: "qc" as const },
-            { label: "SOLUTIONS", color: "#f59e0b", kind: "production" as const },
+            { label: "BOTS",      color: "#7ab8f5", kind: "bot" as const },
+            { label: "ETL",       color: "#3ec9b8", kind: "etl-union" as const },
+            { label: "HITL",      color: "#b39ce0", kind: "qc" as const },
+            { label: "SOLUTIONS", color: "#f5a623", kind: "production" as const },
           ].map((r, i) => (
-            <g key={r.label} transform={`translate(28, ${110 + i * 56})`}>
-              <rect x={-12} y={-12} width={24} height={24} rx={3} fill={r.color} />
-              <g transform="translate(0,0)">
-                {/* tiny icon centered */}
-                <NodeIcon kind={r.kind} cx={0} cy={0} />
-              </g>
-              <text x={0} y={22} textAnchor="middle" fontSize={7} fontWeight={700} fill={r.color} letterSpacing={0.4}>
+            <g key={r.label} transform={`translate(${RAIL_W / 2}, ${74 + i * 38})`}>
+              <rect x={-8} y={-8} width={16} height={16} rx={2.5} fill={r.color} />
+              <NodeIcon kind={r.kind} cx={0} cy={0} />
+              <text x={0} y={16} textAnchor="middle" fontSize={5.5} fontWeight={700} fill={r.color} letterSpacing={0.3}>
                 {r.label}
               </text>
             </g>

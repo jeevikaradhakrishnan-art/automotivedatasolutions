@@ -940,9 +940,6 @@ function SolutionReviewQueue({ solutionId }: { solutionId: string }) {
         <span className="px-2 py-1 rounded border border-amber/30 text-amber bg-amber/5">⏳ {totalPending} PENDING</span>
         <span className="px-2 py-1 rounded border border-success/30 text-success bg-success/5">✓ {totalApproved} APPROVED</span>
         <span className="px-2 py-1 rounded border border-danger/30 text-danger bg-danger/5">✕ {totalRejected} REJECTED</span>
-        <Link to="/hitl" search={{ sol: solutionId }} className="ml-auto text-[11px] font-mono text-primary hover:underline">
-          OPEN FULL HITL QUEUE →
-        </Link>
       </div>
 
       <div className="border border-border rounded-md overflow-hidden">

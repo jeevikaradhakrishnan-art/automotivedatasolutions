@@ -2,9 +2,10 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   ArrowLeft, Check, Plus, FileDown, Sparkles, Database, Workflow, Inbox,
-  Play, Globe, Settings2, Boxes, GitBranch, Send, ListChecks,
+  Play, Globe, Settings2, Boxes, GitBranch, Send, ListChecks, Eye,
   CheckCircle2, AlertCircle, Loader2, Circle, X, Lock, Trash2, Upload,
 } from "lucide-react";
+import { WorkflowPreviewModal } from "@/components/solutions/WorkflowPreviewModal";
 import { getSolution, NEWS_INSIGHTS, type NewsInsight } from "@/data/solutions";
 import {
   usePlatform, downloadFile, toCSV, getWorkflowsFor, INTEGRATIONS,
@@ -290,6 +291,7 @@ function WorkflowsTab({
   onRun: (workflow: Wfl, mode: "full" | "delta", sources: string[]) => void;
 }) {
   const [configuring, setConfiguring] = useState<Wfl | null>(null);
+  const [viewing, setViewing] = useState<Wfl | null>(null);
 
   if (workflows.length === 0) {
     return <div className="panel p-6 text-sm text-muted-foreground">No workflows defined.</div>;
@@ -303,7 +305,13 @@ function WorkflowsTab({
       </div>
       <div className="grid lg:grid-cols-2 gap-3">
         {workflows.map((w) => (
-          <WorkflowCard key={w.id} w={w} onConfigure={() => setConfiguring(w)} onRun={(mode) => onRun(w, mode, solutionSources)} />
+          <WorkflowCard
+            key={w.id}
+            w={w}
+            onConfigure={() => setConfiguring(w)}
+            onView={() => setViewing(w)}
+            onRun={(mode) => onRun(w, mode, solutionSources)}
+          />
         ))}
       </div>
       {configuring && (
@@ -311,17 +319,19 @@ function WorkflowsTab({
           workflow={configuring}
           solutionSources={solutionSources}
           onClose={() => setConfiguring(null)}
+          onView={() => setViewing(configuring)}
           onRun={(mode, picked) => {
             onRun(configuring, mode, picked);
             setConfiguring(null);
           }}
         />
       )}
+      {viewing && <WorkflowPreviewModal workflow={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }
 
-function WorkflowCard({ w, onConfigure, onRun }: { w: Wfl; onConfigure: () => void; onRun: (mode: "full" | "delta") => void }) {
+function WorkflowCard({ w, onConfigure, onView, onRun }: { w: Wfl; onConfigure: () => void; onView: () => void; onRun: (mode: "full" | "delta") => void }) {
   return (
     <div className="panel p-4 space-y-3">
       <div className="flex items-start justify-between gap-2">
@@ -344,7 +354,10 @@ function WorkflowCard({ w, onConfigure, onRun }: { w: Wfl; onConfigure: () => vo
         <span>last {w.lastRun} · next {w.nextRun} · {w.successRate}% ok</span>
       </div>
 
-      <div className="flex gap-2 pt-1">
+      <div className="flex gap-2 pt-1 flex-wrap">
+        <button onClick={onView} className="h-8 px-3 rounded text-[11px] font-mono border border-border hover:border-cyan/30 hover:text-cyan flex items-center gap-1.5">
+          <Eye className="size-3" /> VIEW WORKFLOW
+        </button>
         <button onClick={onConfigure} className="h-8 px-3 rounded text-[11px] font-mono border border-border hover:border-cyan/30 hover:text-cyan flex items-center gap-1.5">
           <Settings2 className="size-3" /> CONFIGURE
         </button>
@@ -388,7 +401,7 @@ function StagePipeline({ stages }: { stages: WorkflowStage[] }) {
   );
 }
 
-function WorkflowConfigDrawer({ workflow, solutionSources, onClose, onRun }: { workflow: Wfl; solutionSources: string[]; onClose: () => void; onRun: (mode: "full" | "delta", sources: string[]) => void }) {
+function WorkflowConfigDrawer({ workflow, solutionSources, onClose, onView, onRun }: { workflow: Wfl; solutionSources: string[]; onClose: () => void; onView: () => void; onRun: (mode: "full" | "delta", sources: string[]) => void }) {
   const [vals, setVals] = useState<Record<string, string | number | boolean | string[]>>(
     () => Object.fromEntries(workflow.params.map((p) => [p.key, p.default])),
   );
@@ -409,7 +422,15 @@ function WorkflowConfigDrawer({ workflow, solutionSources, onClose, onRun }: { w
 
         <div className="p-5 space-y-5">
           <div>
-            <div className="text-[10px] font-mono tracking-widest text-muted-foreground mb-2">PIPELINE</div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[10px] font-mono tracking-widest text-muted-foreground">PIPELINE</div>
+              <button
+                onClick={onView}
+                className="h-7 px-2.5 rounded text-[11px] font-mono border border-cyan/30 text-cyan bg-cyan/5 hover:bg-cyan/10 flex items-center gap-1.5"
+              >
+                <Eye className="size-3" /> VIEW WORKFLOW
+              </button>
+            </div>
             <StagePipeline stages={workflow.stages} />
           </div>
 
@@ -940,9 +961,6 @@ function SolutionReviewQueue({ solutionId }: { solutionId: string }) {
         <span className="px-2 py-1 rounded border border-amber/30 text-amber bg-amber/5">⏳ {totalPending} PENDING</span>
         <span className="px-2 py-1 rounded border border-success/30 text-success bg-success/5">✓ {totalApproved} APPROVED</span>
         <span className="px-2 py-1 rounded border border-danger/30 text-danger bg-danger/5">✕ {totalRejected} REJECTED</span>
-        <Link to="/hitl" search={{ sol: solutionId }} className="ml-auto text-[11px] font-mono text-primary hover:underline">
-          OPEN FULL HITL QUEUE →
-        </Link>
       </div>
 
       <div className="border border-border rounded-md overflow-hidden">

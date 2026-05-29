@@ -60,14 +60,14 @@ function expandStage(stage: WorkflowStage, idx: number): DiagramNode[] {
 }
 
 const COLOR: Record<NodeKind, string> = {
-  input:        "#22c55e",
-  output:       "#22c55e",
-  bot:          "#4f9cf9",
-  "etl-union":  "#2ec4b6",
-  "etl-filter": "#2ec4b6",
-  production:   "#a78bfa",
-  qc:           "#a78bfa",
-  qa:           "#a78bfa",
+  input:        "#2bbf6e",
+  output:       "#2bbf6e",
+  bot:          "#7ab8f5",
+  "etl-union":  "#3ec9b8",
+  "etl-filter": "#3ec9b8",
+  production:   "#b39ce0",
+  qc:           "#b39ce0",
+  qa:           "#b39ce0",
 };
 
 function NodeIcon({ kind, cx, cy }: { kind: NodeKind; cx: number; cy: number }) {
@@ -151,13 +151,13 @@ export function WorkflowDiagram({ name, stages }: { name: string; stages: Workfl
   ];
 
   // Layout constants
-  const NODE = 40;
-  const GAP_X = 64;
-  const GAP_Y = 90;
-  const PAD_X = 70;
-  const PAD_TOP = 80;
-  const RAIL_W = 56;
-  const PER_ROW = 6;
+  const NODE = 28;
+  const GAP_X = 56;
+  const GAP_Y = 70;
+  const PAD_X = 60;
+  const PAD_TOP = 64;
+  const RAIL_W = 42;
+  const PER_ROW = 7;
 
   const rows = Math.ceil(nodes.length / PER_ROW);
 
@@ -189,52 +189,51 @@ export function WorkflowDiagram({ name, stages }: { name: string; stages: Workfl
           </pattern>
         </defs>
 
-        {/* Top action bar */}
-        <rect x={0} y={0} width={innerW} height={48} fill="#ffffff" />
-        <line x1={0} y1={48} x2={innerW} y2={48} stroke="#e5e7eb" />
-        {/* Title chip */}
-        <text x={18} y={30} fontSize={12} fontWeight={600} fill="#111827" fontFamily="ui-sans-serif, system-ui">
+        {/* Top action bar (compact) */}
+        <rect x={0} y={0} width={innerW} height={32} fill="#ffffff" />
+        <line x1={0} y1={32} x2={innerW} y2={32} stroke="#e5e7eb" />
+        <text x={12} y={20} fontSize={9} fontWeight={600} fill="#111827" fontFamily="ui-sans-serif, system-ui">
           {name}
         </text>
         {/* Breadcrumb */}
-        <g transform={`translate(${innerW / 2 - 110}, 16)`}>
-          <circle cx={0} cy={8} r={8} fill="#22c55e" />
-          <path d="M -3 8 L -1 10 L 4 5" stroke="#fff" strokeWidth={1.6} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          <text x={0} y={32} textAnchor="middle" fontSize={9} fontWeight={600} fill="#22c55e">Design</text>
-          <line x1={12} y1={8} x2={92} y2={8} stroke="#d1d5db" />
-          <g transform="translate(104, 0)">
-            <circle cx={0} cy={8} r={8} fill="none" stroke="#cbd5e1" strokeWidth={1.2} />
-            <text x={0} y={11} textAnchor="middle" fontSize={8} fontWeight={600} fill="#94a3b8">2</text>
-            <text x={0} y={32} textAnchor="middle" fontSize={9} fill="#94a3b8">Prototype</text>
+        <g transform={`translate(${innerW / 2 - 80}, 9)`}>
+          <circle cx={0} cy={6} r={5.5} fill="#2bbf6e" />
+          <path d="M -2 6 L -0.5 7.5 L 2.5 4.5" stroke="#fff" strokeWidth={1.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <text x={0} y={22} textAnchor="middle" fontSize={6.5} fontWeight={600} fill="#2bbf6e">Design</text>
+          <line x1={8} y1={6} x2={68} y2={6} stroke="#d1d5db" />
+          <g transform="translate(76, 0)">
+            <circle cx={0} cy={6} r={5.5} fill="none" stroke="#cbd5e1" strokeWidth={1} />
+            <text x={0} y={8.5} textAnchor="middle" fontSize={6} fontWeight={600} fill="#94a3b8">2</text>
+            <text x={0} y={22} textAnchor="middle" fontSize={6.5} fill="#94a3b8">Prototype</text>
           </g>
-          <line x1={116} y1={8} x2={196} y2={8} stroke="#d1d5db" />
-          <g transform="translate(208, 0)">
-            <circle cx={0} cy={8} r={8} fill="none" stroke="#cbd5e1" strokeWidth={1.2} />
-            <text x={0} y={11} textAnchor="middle" fontSize={8} fontWeight={600} fill="#94a3b8">3</text>
-            <text x={0} y={32} textAnchor="middle" fontSize={9} fill="#94a3b8">Publish</text>
+          <line x1={84} y1={6} x2={144} y2={6} stroke="#d1d5db" />
+          <g transform="translate(152, 0)">
+            <circle cx={0} cy={6} r={5.5} fill="none" stroke="#cbd5e1" strokeWidth={1} />
+            <text x={0} y={8.5} textAnchor="middle" fontSize={6} fontWeight={600} fill="#94a3b8">3</text>
+            <text x={0} y={22} textAnchor="middle" fontSize={6.5} fill="#94a3b8">Publish</text>
           </g>
         </g>
-        {/* Action buttons */}
-        <g transform={`translate(${innerW - 220}, 12)`}>
-          <rect x={0} y={0} width={56} height={22} rx={3} fill="#fff" stroke="#22c55e" />
-          <text x={28} y={15} textAnchor="middle" fontSize={9} fontWeight={700} fill="#22c55e">CLONE</text>
-          <rect x={64} y={0} width={56} height={22} rx={3} fill="#fff" stroke="#22c55e" />
-          <text x={92} y={15} textAnchor="middle" fontSize={9} fontWeight={700} fill="#22c55e">SAVE</text>
-          <rect x={128} y={0} width={92} height={22} rx={3} fill="#22c55e" />
-          <text x={170} y={15} textAnchor="middle" fontSize={9} fontWeight={700} fill="#fff">SAVE &amp; NEXT ›</text>
+        {/* Action buttons (compact) */}
+        <g transform={`translate(${innerW - 148}, 7)`}>
+          <rect x={0} y={0} width={38} height={16} rx={2} fill="#fff" stroke="#2bbf6e" strokeWidth={0.8} />
+          <text x={19} y={11} textAnchor="middle" fontSize={6.5} fontWeight={700} fill="#2bbf6e">CLONE</text>
+          <rect x={42} y={0} width={34} height={16} rx={2} fill="#fff" stroke="#2bbf6e" strokeWidth={0.8} />
+          <text x={59} y={11} textAnchor="middle" fontSize={6.5} fontWeight={700} fill="#2bbf6e">SAVE</text>
+          <rect x={78} y={0} width={64} height={16} rx={2} fill="#2bbf6e" />
+          <text x={110} y={11} textAnchor="middle" fontSize={6.5} fontWeight={700} fill="#fff">SAVE &amp; NEXT ›</text>
         </g>
 
         {/* Canvas */}
-        <rect x={0} y={48} width={innerW} height={height - 48} fill="url(#wf-dots)" />
+        <rect x={0} y={32} width={innerW} height={height - 32} fill="url(#wf-dots)" />
 
-        {/* Zoom controls */}
-        <g transform={`translate(${innerW - 110}, 60)`}>
-          <rect x={0} y={0} width={26} height={22} rx={3} fill="#fff" stroke="#e5e7eb" />
-          <text x={13} y={16} textAnchor="middle" fontSize={12} fill="#6b7280">−</text>
-          <rect x={30} y={0} width={26} height={22} rx={3} fill="#fff" stroke="#e5e7eb" />
-          <text x={43} y={15} textAnchor="middle" fontSize={10} fill="#6b7280">⛶</text>
-          <rect x={60} y={0} width={26} height={22} rx={3} fill="#fff" stroke="#e5e7eb" />
-          <text x={73} y={16} textAnchor="middle" fontSize={12} fill="#6b7280">+</text>
+        {/* Zoom controls (compact) */}
+        <g transform={`translate(${innerW - 70}, 40)`}>
+          <rect x={0} y={0} width={16} height={14} rx={2} fill="#fff" stroke="#e5e7eb" />
+          <text x={8} y={10} textAnchor="middle" fontSize={8} fill="#6b7280">−</text>
+          <rect x={18} y={0} width={16} height={14} rx={2} fill="#fff" stroke="#e5e7eb" />
+          <text x={26} y={10} textAnchor="middle" fontSize={7} fill="#6b7280">⛶</text>
+          <rect x={36} y={0} width={16} height={14} rx={2} fill="#fff" stroke="#e5e7eb" />
+          <text x={44} y={10} textAnchor="middle" fontSize={8} fill="#6b7280">+</text>
         </g>
 
         {/* Orthogonal connectors that route AROUND nodes */}
@@ -282,24 +281,27 @@ export function WorkflowDiagram({ name, stages }: { name: string; stages: Workfl
           const cy = n.y + NODE / 2;
           return (
             <g key={n.id}>
-              <rect x={n.x} y={n.y} width={NODE} height={NODE} rx={5} ry={5} fill={fill} />
-              <NodeIcon kind={n.kind} cx={cx} cy={cy} />
+              <rect x={n.x} y={n.y} width={NODE} height={NODE} rx={4} ry={4} fill={fill} />
+              <g transform={`translate(${cx}, ${cy}) scale(0.65)`}>
+                <NodeIcon kind={n.kind} cx={0} cy={0} />
+              </g>
               <g>
                 <rect
-                  x={n.x - 28}
-                  y={n.y + NODE + 6}
-                  width={NODE + 56}
-                  height={18}
-                  rx={2.5}
-                  ry={2.5}
+                  x={n.x - 20}
+                  y={n.y + NODE + 4}
+                  width={NODE + 40}
+                  height={12}
+                  rx={2}
+                  ry={2}
                   fill="#ffffff"
                   stroke="#e5e7eb"
+                  strokeWidth={0.6}
                 />
                 <text
                   x={cx}
-                  y={n.y + NODE + 18}
+                  y={n.y + NODE + 12}
                   textAnchor="middle"
-                  fontSize={8.5}
+                  fontSize={6}
                   fontFamily="ui-sans-serif, system-ui"
                   fill="#374151"
                 >
@@ -310,27 +312,24 @@ export function WorkflowDiagram({ name, stages }: { name: string; stages: Workfl
           );
         })}
 
-        {/* Right rail */}
+        {/* Right rail (compact) */}
         <g transform={`translate(${innerW}, 0)`}>
           <rect x={0} y={0} width={RAIL_W} height={height} fill="#ffffff" stroke="#e5e7eb" />
           {/* search */}
-          <g transform="translate(28, 64)">
-            <circle cx={0} cy={0} r={6} fill="none" stroke="#94a3b8" strokeWidth={1.2} />
-            <line x1={4} y1={4} x2={9} y2={9} stroke="#94a3b8" strokeWidth={1.2} />
+          <g transform={`translate(${RAIL_W / 2}, 44)`}>
+            <circle cx={0} cy={0} r={4} fill="none" stroke="#94a3b8" strokeWidth={1} />
+            <line x1={2.8} y1={2.8} x2={6} y2={6} stroke="#94a3b8" strokeWidth={1} />
           </g>
           {[
-            { label: "BOTS",      color: "#4f9cf9", kind: "bot" as const },
-            { label: "ETL",       color: "#2ec4b6", kind: "etl-union" as const },
-            { label: "HITL",      color: "#a78bfa", kind: "qc" as const },
-            { label: "SOLUTIONS", color: "#f59e0b", kind: "production" as const },
+            { label: "BOTS",      color: "#7ab8f5", kind: "bot" as const },
+            { label: "ETL",       color: "#3ec9b8", kind: "etl-union" as const },
+            { label: "HITL",      color: "#b39ce0", kind: "qc" as const },
+            { label: "SOLUTIONS", color: "#f5a623", kind: "production" as const },
           ].map((r, i) => (
-            <g key={r.label} transform={`translate(28, ${110 + i * 56})`}>
-              <rect x={-12} y={-12} width={24} height={24} rx={3} fill={r.color} />
-              <g transform="translate(0,0)">
-                {/* tiny icon centered */}
-                <NodeIcon kind={r.kind} cx={0} cy={0} />
-              </g>
-              <text x={0} y={22} textAnchor="middle" fontSize={7} fontWeight={700} fill={r.color} letterSpacing={0.4}>
+            <g key={r.label} transform={`translate(${RAIL_W / 2}, ${74 + i * 38})`}>
+              <rect x={-8} y={-8} width={16} height={16} rx={2.5} fill={r.color} />
+              <g transform="scale(0.55)"><NodeIcon kind={r.kind} cx={0} cy={0} /></g>
+              <text x={0} y={16} textAnchor="middle" fontSize={5.5} fontWeight={700} fill={r.color} letterSpacing={0.3}>
                 {r.label}
               </text>
             </g>

@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
-import { Command as CommandIcon, ChevronDown, LayoutGrid, Sparkles, ClipboardCheck } from "lucide-react";
+import { Command as CommandIcon, ChevronDown, LayoutGrid, Sparkles } from "lucide-react";
 import { usePlatform } from "@/store/platform";
 import { SOLUTIONS } from "@/data/solutions";
 import { CAPABILITIES } from "@/data/capabilities";
@@ -54,7 +54,6 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (v:
     () => [
       { label: "Solutions", icon: LayoutGrid, action: () => navigate({ to: "/" }) },
       { label: "Use-cases", icon: Sparkles, action: () => navigate({ to: "/capabilities" }) },
-      { label: "Review · HITL", icon: ClipboardCheck, action: () => navigate({ to: "/hitl" }) },
     ],
     [navigate],
   );

@@ -401,7 +401,7 @@ function StagePipeline({ stages }: { stages: WorkflowStage[] }) {
   );
 }
 
-function WorkflowConfigDrawer({ workflow, solutionSources, onClose, onRun }: { workflow: Wfl; solutionSources: string[]; onClose: () => void; onRun: (mode: "full" | "delta", sources: string[]) => void }) {
+function WorkflowConfigDrawer({ workflow, solutionSources, onClose, onView, onRun }: { workflow: Wfl; solutionSources: string[]; onClose: () => void; onView: () => void; onRun: (mode: "full" | "delta", sources: string[]) => void }) {
   const [vals, setVals] = useState<Record<string, string | number | boolean | string[]>>(
     () => Object.fromEntries(workflow.params.map((p) => [p.key, p.default])),
   );
@@ -422,7 +422,15 @@ function WorkflowConfigDrawer({ workflow, solutionSources, onClose, onRun }: { w
 
         <div className="p-5 space-y-5">
           <div>
-            <div className="text-[10px] font-mono tracking-widest text-muted-foreground mb-2">PIPELINE</div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[10px] font-mono tracking-widest text-muted-foreground">PIPELINE</div>
+              <button
+                onClick={onView}
+                className="h-7 px-2.5 rounded text-[11px] font-mono border border-cyan/30 text-cyan bg-cyan/5 hover:bg-cyan/10 flex items-center gap-1.5"
+              >
+                <Eye className="size-3" /> VIEW WORKFLOW
+              </button>
+            </div>
             <StagePipeline stages={workflow.stages} />
           </div>
 

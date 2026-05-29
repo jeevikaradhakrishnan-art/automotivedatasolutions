@@ -60,14 +60,14 @@ function expandStage(stage: WorkflowStage, idx: number): DiagramNode[] {
 }
 
 const COLOR: Record<NodeKind, string> = {
-  input:        "#22c55e",
-  output:       "#22c55e",
-  bot:          "#4f9cf9",
-  "etl-union":  "#2ec4b6",
-  "etl-filter": "#2ec4b6",
-  production:   "#a78bfa",
-  qc:           "#a78bfa",
-  qa:           "#a78bfa",
+  input:        "#2bbf6e",
+  output:       "#2bbf6e",
+  bot:          "#7ab8f5",
+  "etl-union":  "#3ec9b8",
+  "etl-filter": "#3ec9b8",
+  production:   "#b39ce0",
+  qc:           "#b39ce0",
+  qa:           "#b39ce0",
 };
 
 function NodeIcon({ kind, cx, cy }: { kind: NodeKind; cx: number; cy: number }) {

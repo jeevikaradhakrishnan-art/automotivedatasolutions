@@ -2,9 +2,10 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   ArrowLeft, Check, Plus, FileDown, Sparkles, Database, Workflow, Inbox,
-  Play, Globe, Settings2, Boxes, GitBranch, Send, ListChecks,
+  Play, Globe, Settings2, Boxes, GitBranch, Send, ListChecks, Eye,
   CheckCircle2, AlertCircle, Loader2, Circle, X, Lock, Trash2, Upload,
 } from "lucide-react";
+import { WorkflowPreviewModal } from "@/components/solutions/WorkflowPreviewModal";
 import { getSolution, NEWS_INSIGHTS, type NewsInsight } from "@/data/solutions";
 import {
   usePlatform, downloadFile, toCSV, getWorkflowsFor, INTEGRATIONS,

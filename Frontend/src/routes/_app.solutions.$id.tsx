@@ -141,6 +141,7 @@ function SolutionDetail() {
                   jobId:       localJobId,
                   uid:         h.uid as string | undefined,
                   htmlFile:    h.htmlFile as string | undefined,
+                  liveUrl:     h.liveUrl as string | undefined,
                   recordName:  h.recordName as string | undefined,
                   summary:     h.summary as string,
                   detail:      h.detail as string,

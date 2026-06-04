@@ -1005,16 +1005,21 @@ function BotHtmlViewer({
   // Pass iframe element up so parent can postMessage to it
   useEffect(() => { onIframe(iframeRef.current); }, [loaded]); // eslint-disable-line
 
-  // Fetch + inject on item change
+  // Fetch + inject on item change — prefer live proxy, fall back to saved HTML
   useEffect(() => {
     setLoaded(false);
     setSrcdoc("");
-    if (!item.htmlFile) return;
-    fetch(`http://localhost:8000/api/html/${encodeURIComponent(item.htmlFile)}`)
+    const sourceUrl = item.liveUrl
+      ? `http://localhost:8000/api/proxy?url=${encodeURIComponent(item.liveUrl)}`
+      : item.htmlFile
+      ? `http://localhost:8000/api/html/${encodeURIComponent(item.htmlFile)}`
+      : null;
+    if (!sourceUrl) return;
+    fetch(sourceUrl)
       .then((r) => r.text())
       .then((html) => setSrcdoc(injectAnnotationLayer(html)))
-      .catch(() => setSrcdoc(`<html><body style="font-family:sans-serif;padding:20px;color:#666"><p>Could not load source HTML: <code>${item.htmlFile}</code></p></body></html>`));
-  }, [item.htmlFile, item.id]);
+      .catch(() => setSrcdoc(`<html><body style="font-family:sans-serif;padding:20px;color:#666"><p>Could not load source page.</p></body></html>`));
+  }, [item.htmlFile, item.liveUrl, item.id]);
 
   // Send highlights when iframe is ready or fields change
   useEffect(() => {
@@ -1035,8 +1040,19 @@ function BotHtmlViewer({
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2 px-2 py-1 rounded border border-cyan/30 bg-cyan/5 text-[10px] font-mono text-cyan">
         <Globe className="size-3" />
-        <span className="truncate">{item.htmlFile}</span>
+        <span className="truncate">{item.liveUrl ?? item.htmlFile}</span>
         {item.uid && <span className="ml-auto shrink-0 text-muted-foreground">UID: {item.uid}</span>}
+        {item.liveUrl && (
+          <a
+            href={item.liveUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 px-2 py-0.5 rounded bg-cyan/20 hover:bg-cyan/30 text-cyan border border-cyan/40 transition-colors"
+            title="Open live Tesla page"
+          >
+            Open Live ↗
+          </a>
+        )}
       </div>
       {srcdoc ? (
         <iframe

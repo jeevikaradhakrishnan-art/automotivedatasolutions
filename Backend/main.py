@@ -34,7 +34,7 @@ BOTS: dict[str, dict] = {
     },
     "tesla-configurator": {
         "name": "Tesla Configurator",
-        "script": "tesla_data_extractor.py",
+        "script": "tesla_live_extractor.py",
         "output_file": "tesla.json",
         "description": "Downloads real Tesla configurator pages and extracts Model Y, 3, S & X trim data",
     },
@@ -190,6 +190,7 @@ def _build_hitl_items(bot_id: str, records: list[dict], job_id: str) -> list[dic
             "jobId":       job_id,
             "uid":         uid,
             "htmlFile":    html_file,
+            "liveUrl":     record.get("configurator_url", ""),
             "recordName":  record_name,
             "summary":     summary,
             "detail":      detail,
@@ -674,3 +675,68 @@ def serve_html(filename: str):
     content = html_path.read_text(encoding="utf-8")
     content = _strip_scripts(content)
     return Response(content=content, media_type="text/html")
+
+
+# ── Live page proxy (strips X-Frame-Options / CSP so pages iframe correctly) ──
+
+import urllib.parse as _urlparse
+import random as _random
+import requests as _requests
+
+_PROXY_UA_POOL = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:138.0) Gecko/20100101 Firefox/138.0",
+]
+
+
+@app.get("/api/proxy")
+def proxy_live_page(url: str = Query(...)):
+    """Fetch a live URL server-side and return its HTML for iframe embedding."""
+    parsed = _urlparse.urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise HTTPException(status_code=400, detail="Invalid URL")
+
+    ua = _random.choice(_PROXY_UA_POOL)
+    try:
+        resp = _requests.get(
+            url,
+            headers={
+                "User-Agent": ua,
+                "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://www.google.com/",
+                "Cache-Control": "no-cache",
+            },
+            timeout=15,
+            allow_redirects=True,
+        )
+        if resp.status_code == 200 and len(resp.text) > 20_000:
+            content = _strip_scripts(resp.text)
+            return Response(content=content, media_type="text/html")
+    except Exception:
+        pass
+
+    # Fallback: serve a minimal page with a direct link to the live URL
+    domain = parsed.netloc
+    fallback = f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8">
+<style>
+  body{{font-family:-apple-system,sans-serif;background:#171a20;color:#e8e8e8;
+       display:flex;flex-direction:column;align-items:center;justify-content:center;
+       height:100vh;margin:0;gap:16px;text-align:center}}
+  h2{{font-size:18px;font-weight:400;color:#aaa;margin:0}}
+  p{{font-size:13px;color:#666;margin:0}}
+  a{{display:inline-block;margin-top:8px;padding:10px 22px;background:#3e6ae1;
+     color:#fff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:500}}
+  a:hover{{background:#5580f0}}
+</style>
+</head>
+<body>
+  <h2>Live preview blocked by {domain}</h2>
+  <p>The site prevents server-side fetching. Open it directly in a new tab.</p>
+  <a href="{url}" target="_blank" rel="noopener noreferrer">Open on {domain} ↗</a>
+</body>
+</html>"""
+    return Response(content=fallback, media_type="text/html")

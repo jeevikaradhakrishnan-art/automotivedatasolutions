@@ -50,6 +50,7 @@ export interface HitlItem {
   jobId?: string;
   uid?: string;
   htmlFile?: string;
+  liveUrl?: string;
   workflow?: string;
   recordName?: string;
   summary: string;

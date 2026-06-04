@@ -15,7 +15,6 @@ import random
 import requests
 from pathlib import Path
 from datetime import datetime
-from playwright.sync_api import sync_playwright
 
 LINEUP = [
     # ── Model Y ──────────────────────────────────────────────────────────────
@@ -588,6 +587,7 @@ def _browser_fetch_all_models(model_urls: dict[str, list[str]]) -> dict[str, str
     results: dict[str, str | None] = {m: None for m in model_urls}
 
     try:
+        from playwright.sync_api import sync_playwright
         with sync_playwright() as pw:
             browser = pw.chromium.launch(
                 headless=False,
@@ -885,14 +885,22 @@ if __name__ == "__main__":
     for v in LINEUP:
         trims_by_model[v["model"]].append(v)
 
-    # ── Step 2: HTTP fast-pass for any model that responds cleanly ────────────
+    # ── Step 2: use cached file if valid, otherwise try HTTP fast-pass ───────
     http_results: dict[str, str | None] = {}
     for model, page_cfg in MODEL_PAGES.items():
+        page_path = html_dir / page_cfg["filename"]
+        if page_path.exists():
+            try:
+                cached = page_path.read_text(encoding="utf-8")
+                if _is_real_tesla_html(cached, model):
+                    http_results[model] = cached
+                    print(f"[INFO]   {model}: valid cached file found — skipping live download")
+                    continue
+            except Exception:
+                pass
         http_results[model] = _download_model_page_http(model, page_cfg["urls"])
 
-    # ── Step 3: Browser with FRESH CONTEXT per model ─────────────────────────
-    #   Each model gets its own browser context (fresh cookies/storage) so Tesla's
-    #   CDN cannot link models via session fingerprinting and issue 403 responses.
+    # ── Step 3: Browser only for models not satisfied by cache or HTTP ───────
     browser_needed = {m: MODEL_PAGES[m]["urls"] for m in MODEL_PAGES if not http_results.get(m)}
     browser_results: dict[str, str | None] = {}
     if browser_needed:

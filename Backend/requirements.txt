@@ -1,0 +1,11 @@
+# Backend API
+fastapi==0.115.0
+uvicorn==0.30.6
+sse-starlette==2.1.3
+
+# Bot dependencies (shared — install once for the whole project)
+requests
+beautifulsoup4
+lxml
+pathvalidate
+urllib3

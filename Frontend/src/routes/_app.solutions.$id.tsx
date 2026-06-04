@@ -16,6 +16,15 @@ import { DataPreviewTable } from "@/components/solutions/DataPreviewTable";
 import { JobsTable } from "@/components/solutions/JobsTable";
 import { InsightDetailModal } from "@/components/solutions/InsightDetailModal";
 
+const generateId = (): string => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+    return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+};
+
 type Tab = "sources" | "workflows" | "jobs" | "review" | "data" | "integrations" | "insights";
 
 export const Route = createFileRoute("/_app/solutions/$id")({
@@ -70,7 +79,7 @@ function SolutionDetail() {
 
     // For real bot sources, call the backend
     if (botId) {
-      const localJobId = crypto.randomUUID();
+      const localJobId = generateId();
       const job: Job = {
         id: localJobId,
         solutionId: solution.id,
@@ -154,7 +163,7 @@ function SolutionDetail() {
 
     // Fallback simulation for non-scripted sources
     const job: Job = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       solutionId: solution.id,
       source: sourceName,
       workflow: workflow?.name,
@@ -197,7 +206,7 @@ function SolutionDetail() {
       solution.sampleRows.slice(0, reviewN).forEach((r, i) => {
         const recName = Object.values(r).slice(0, 2).join(" · ");
         addHitl({
-          id: crypto.randomUUID(), solutionId: solution.id, jobId: job.id, workflow: workflow?.name,
+          id: generateId(), solutionId: solution.id, jobId: job.id, workflow: workflow?.name,
           recordName: recName, summary: recName,
           detail: `Auto-flagged for human verification — confidence below threshold on key fields.`,
           fields: solution.sampleColumns.map((c) => ({
@@ -385,7 +394,7 @@ function SolutionDetail() {
       )}
 
       <InsightDetailModal insight={openInsight} onClose={() => setOpenInsight(null)} />
-      {openJob && <JobDrawer job={openJob} onClose={() => setOpenJob(null)} onDownload={handleDownload} onFeedback={(rating, message) => addFeedback({ id: crypto.randomUUID(), solutionId: solution.id, workflow: openJob.workflow, jobId: openJob.id, rating, message, createdAt: new Date().toISOString() })} />}
+      {openJob && <JobDrawer job={openJob} onClose={() => setOpenJob(null)} onDownload={handleDownload} onFeedback={(rating, message) => addFeedback({ id: generateId(), solutionId: solution.id, workflow: openJob.workflow, jobId: openJob.id, rating, message, createdAt: new Date().toISOString() })} />}
     </div>
   );
 }
@@ -940,7 +949,7 @@ function IntegrationLinkDrawer({
             <button
               disabled={!workflowId || !target}
               onClick={() => onSave({
-                id: crypto.randomUUID(),
+                id: generateId(),
                 integrationId: integration.id,
                 solutionId,
                 workflowId,

@@ -23,7 +23,6 @@ import json
 import re
 from datetime import datetime
 from urllib.parse import urljoin
-from playwright.sync_api import sync_playwright
 
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
@@ -199,6 +198,7 @@ def _ensure_html_files() -> None:
     # download Tesla's CDN flags it and returns 403 for subsequent pages.
     # A fresh context starts with no cookies — each model looks like a new visitor.
     try:
+        from playwright.sync_api import sync_playwright
         with sync_playwright() as pw:
             browser = pw.chromium.launch(
                 headless=False,

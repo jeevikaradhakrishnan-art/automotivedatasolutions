@@ -1,5 +1,4 @@
 import copy
-import shutil
 from pathvalidate import sanitize_filename
 from datetime import date, datetime
 import json
@@ -18,130 +17,6 @@ from collections import defaultdict
 # Suppress only the single warning from urllib3 needed.
 urllib3.disable_warnings(InsecureRequestWarning)
 
-
-def _generate_bmw_html(record: dict, uid: str) -> str:
-    """Generate a BMW configurator-style HTML page from extracted data for HITL review."""
-    name        = record.get("Name", uid)
-    derivative  = record.get("Derivative", "")
-    fuel        = record.get("Fuel Type", "")
-    drive       = record.get("Drive Type", "")
-    body        = record.get("Body Style", "")
-    doors       = record.get("Doors", "")
-    price       = record.get("Price", "")
-    currency    = record.get("Currency", "£")
-    series      = record.get("Series", "")
-    country     = record.get("Country", "")
-    cfg_link    = record.get("Configurator Page Link", "#")
-    tech_link   = record.get("Technical Data Page Link", "#")
-    created     = record.get("Creation date", "")
-
-    tech = record.get("Technical_and_Transmission_details", {})
-    tech_rows = ""
-    for k, v in tech.items():
-        if not isinstance(v, (dict, list)):
-            tech_rows += f'<tr><td class="tk">{k}</td><td class="tv">{v}</td></tr>'
-
-    paint_rows = ""
-    for p in record.get("PAINT", []):
-        sel = "selected" if p.get("type") == "Std" else ""
-        paint_rows += (
-            f'<div class="opt {sel}">'
-            f'<span>{p.get("color","")}</span>'
-            f'<span class="op">{p.get("price","")}</span>'
-            f'</div>'
-        )
-
-    wheel_rows = ""
-    for w in record.get("WHEELS", []):
-        sel = "selected" if w.get("type") == "Std" else ""
-        wheel_rows += (
-            f'<div class="opt {sel}">'
-            f'<span>{w.get("wheels_type","")}</span>'
-            f'<span class="op">{w.get("price","")}</span>'
-            f'</div>'
-        )
-
-    interior_rows = ""
-    for i in record.get("INTERIOR", []):
-        sel = "selected" if i.get("type") == "Std" else ""
-        interior_rows += (
-            f'<div class="opt {sel}">'
-            f'<span>{i.get("interior_type","")}</span>'
-            f'<span class="op">{i.get("price","")}</span>'
-            f'</div>'
-        )
-
-    std_equip = ""
-    for item in record.get("Standard Equipment", []):
-        std_equip += f'<li>{item}</li>' if isinstance(item, str) else ""
-
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>BMW {name}</title>
-<style>
-  *{{margin:0;padding:0;box-sizing:border-box}}
-  body{{font-family:'BMW Helvetica','Helvetica Neue',sans-serif;background:#f2f2f2;color:#1c1c1c;font-size:14px}}
-  .uid-badge{{position:fixed;top:10px;right:10px;background:#1c69d4;color:#fff;padding:3px 10px;border-radius:3px;font-size:11px;font-family:monospace;z-index:99}}
-  .nav{{background:#fff;padding:16px 40px;border-bottom:3px solid #1c69d4;display:flex;align-items:center;gap:16px}}
-  .nav .brand{{font-size:26px;font-weight:700;color:#1c69d4;letter-spacing:2px}}
-  .nav .model-name{{font-size:13px;color:#666}}
-  .hero{{background:#1c1c1c;color:#fff;padding:36px 40px}}
-  .hero h1{{font-size:28px;font-weight:300}}
-  .hero .sub{{color:#aaa;margin-top:6px;font-size:15px}}
-  .hero .price{{font-size:24px;font-weight:600;color:#1c69d4;margin-top:14px}}
-  .meta-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#ddd;margin:0}}
-  .meta-cell{{background:#fff;padding:18px 20px}}
-  .meta-cell .ml{{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px}}
-  .meta-cell .mv{{font-size:15px;font-weight:500;margin-top:4px}}
-  .section{{padding:24px 40px;border-bottom:1px solid #ddd;background:#fff;margin-top:4px}}
-  .section h2{{font-size:16px;font-weight:600;margin-bottom:14px;color:#1c1c1c}}
-  table{{width:100%;border-collapse:collapse}}
-  .tk{{width:45%;padding:8px 12px;border-bottom:1px solid #eee;color:#555;font-size:13px}}
-  .tv{{padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;font-weight:500}}
-  .opt{{display:flex;justify-content:space-between;padding:11px 14px;border:1px solid #ddd;border-radius:3px;margin-bottom:7px;background:#fafafa}}
-  .opt.selected{{border-color:#1c69d4;background:#e8f0fb}}
-  .op{{color:#888}}
-  ul{{padding-left:18px;line-height:1.8;color:#444}}
-  .footer{{padding:20px 40px;color:#999;font-size:11px;background:#f8f8f8;border-top:1px solid #ddd}}
-  a{{color:#1c69d4;text-decoration:none}}
-</style>
-</head>
-<body>
-<div class="uid-badge">UID: {uid}</div>
-<div class="nav">
-  <div class="brand">BMW</div>
-  <div class="model-name">{name} &middot; {series}</div>
-</div>
-<div class="hero">
-  <h1>{name}</h1>
-  <div class="sub">{derivative} &middot; {fuel} &middot; {drive} &middot; {body} &middot; {doors} doors &middot; {country}</div>
-  <div class="price">{currency}{price}</div>
-</div>
-<div class="meta-grid">
-  <div class="meta-cell"><div class="ml">Fuel Type</div><div class="mv">{fuel}</div></div>
-  <div class="meta-cell"><div class="ml">Drive Type</div><div class="mv">{drive}</div></div>
-  <div class="meta-cell"><div class="ml">Body Style</div><div class="mv">{body}</div></div>
-  <div class="meta-cell"><div class="ml">Doors</div><div class="mv">{doors}</div></div>
-</div>
-<div class="section">
-  <h2>Technical &amp; Transmission Details</h2>
-  <table><tbody>{tech_rows}</tbody></table>
-</div>
-{'<div class="section"><h2>Exterior Paint</h2>' + paint_rows + '</div>' if paint_rows else ''}
-{'<div class="section"><h2>Wheels</h2>' + wheel_rows + '</div>' if wheel_rows else ''}
-{'<div class="section"><h2>Interior</h2>' + interior_rows + '</div>' if interior_rows else ''}
-{'<div class="section"><h2>Standard Equipment</h2><ul>' + std_equip + '</ul></div>' if std_equip else ''}
-<div class="footer">
-  Source: <a href="{cfg_link}" target="_blank">BMW Configurator</a> &nbsp;&middot;&nbsp;
-  Technical: <a href="{tech_link}" target="_blank">Technical Data</a> &nbsp;&middot;&nbsp;
-  Extracted: {datetime.now().strftime("%Y-%m-%d %H:%M UTC")} &nbsp;&middot;&nbsp;
-  UID: {uid} &nbsp;&middot;&nbsp;
-  Created: {created}
-</div>
-</body>
-</html>"""
 
 bmw_config_data = {}
 try:
@@ -857,12 +732,13 @@ def extract_diesel_data(json_data):
 if __name__ == '__main__':
     print("[INFO] BMW Data Collector starting...")
     prev_block = ""
-    html_path = 'HTML/'
+    html_path = 'Cache/'
     output_path = 'Output/'
     os.makedirs(html_path, exist_ok=True)
     os.makedirs(output_path, exist_ok=True)
     all_records = []
     uid_counter = 1
+    MAX_RECORDS = 3
     sess = requests.Session()
     sess.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36'
     models_url = 'https://www.bmw.co.uk/en/all-models.html'
@@ -991,11 +867,17 @@ if __name__ == '__main__':
                     data = obj.json()
             price_data = data
             for series_key, series_data in data.items():
+                if len(all_records) >= MAX_RECORDS:
+                    break
                 model_ranges = series_data.get("modelRanges", {})
                 for model_range_key, model_range_data in model_ranges.items():
+                    if len(all_records) >= MAX_RECORDS:
+                        break
                     models = model_range_data.get("models", {})
                     lines_block = model_range_data.get("lines", {})
                     for model_code, model_data in models.items():
+                        if len(all_records) >= MAX_RECORDS:
+                            break
                         description = model_data.get('phrases', {}).get(
                             'en', {}).get('longDescription')
                         # additionalData = model_data.get('additionalData')
@@ -1241,18 +1123,10 @@ if __name__ == '__main__':
                         car_key = f"{model_name_cleaned}_{car_key}"
                         cleaned_car_key = sanitize_filename(
                             car_key, replacement_text="_")
-                        # Assign UID and generate source HTML for HITL
+                        # Assign UID and live configurator URL (HITL shows live BMW page)
                         uid = f"BMW_{uid_counter:03d}"
                         car_detail_model["uid"] = uid
-
-                        html_filename = f"bmw_{uid}.html"
-                        src_html = f"{html_path}{model_name_cleaned}_Vehical_Information.html"
-                        if os.path.exists(src_html):
-                            shutil.copy(src_html, f"{html_path}{html_filename}")
-                        else:
-                            with open(f"{html_path}{html_filename}", "w", encoding="utf-8") as hf:
-                                hf.write(_generate_bmw_html(car_detail_model, uid))
-                        car_detail_model["html_file"] = html_filename
+                        car_detail_model["configurator_url"] = build_and_price_url or ""
 
                         out_file = f'{output_path}car_detail_{cleaned_car_key}.json'
                         with open(out_file, 'w', encoding="utf-8") as fh:
@@ -1267,7 +1141,6 @@ if __name__ == '__main__':
     bmw_json = f"{output_path}bmw.json"
     with open(bmw_json, "w", encoding="utf-8") as fh:
         json.dump(all_records, fh, indent=4, ensure_ascii=False)
-    print(f"[INFO] BMW extraction complete. {counter} records written.")
+    print(f"[INFO] BMW extraction complete. {counter} records written (limit: {MAX_RECORDS}).")
     print(f"[INFO] Combined output : {os.path.abspath(bmw_json)}")
     print(f"[INFO] Output folder   : {os.path.abspath(output_path)}")
-    print(f"[INFO] HTML folder     : {os.path.abspath(html_path)}")

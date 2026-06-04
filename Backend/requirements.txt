@@ -9,3 +9,7 @@ beautifulsoup4
 lxml
 pathvalidate
 urllib3
+bs4
+
+# JS-rendered page proxy (Tesla HITL)
+playwright

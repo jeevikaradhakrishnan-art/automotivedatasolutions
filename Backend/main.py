@@ -34,7 +34,7 @@ BOTS: dict[str, dict] = {
     },
     "tesla-configurator": {
         "name": "Tesla Configurator",
-        "script": "tesla_live_extractor.py",
+        "script": "tesla_data_extractor.py",
         "output_file": "tesla.json",
         "description": "Downloads real Tesla configurator pages and extracts Model Y, 3, S & X trim data",
     },
@@ -51,6 +51,10 @@ _locks: dict[str, threading.Lock] = {bot_id: threading.Lock() for bot_id in BOTS
 # Jobs store: job_id -> job dict
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
+
+# Running subprocess handles: job_id -> Popen (so abort can kill them)
+_procs: dict = {}
+_procs_lock = threading.Lock()
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -190,7 +194,7 @@ def _build_hitl_items(bot_id: str, records: list[dict], job_id: str) -> list[dic
             "jobId":       job_id,
             "uid":         uid,
             "htmlFile":    html_file,
-            "liveUrl":     record.get("configurator_url", ""),
+            "liveUrl":     record.get("configurator_url", "") or record.get("Configurator Page Link", ""),
             "recordName":  record_name,
             "summary":     summary,
             "detail":      detail,
@@ -208,6 +212,7 @@ def _run_bot_thread(bot_id: str, job_id: Optional[str] = None, use_cached: bool 
     script_path = BOT_DIR / cfg["script"]
     output_dir  = BOT_DIR / "Output"
     output_dir.mkdir(exist_ok=True)
+    _append_log(bot_id, f"[INFO] ── {cfg['name']} ── job {(job_id or '')[:8]} ── {'cached' if use_cached else 'live'} ──")
 
     pre_existing = set(glob.glob(str(output_dir / "*.json")))
     exit_code    = -1
@@ -247,10 +252,16 @@ def _run_bot_thread(bot_id: str, job_id: Optional[str] = None, use_cached: bool 
                     bufsize=1,
                     env=env,
                 )
+                if job_id:
+                    with _procs_lock:
+                        _procs[job_id] = proc
                 for raw_line in proc.stdout:       # type: ignore[union-attr]
                     _append_log(bot_id, raw_line.rstrip())
                 proc.wait()
                 exit_code = proc.returncode
+                if job_id:
+                    with _procs_lock:
+                        _procs.pop(job_id, None)
             except Exception as exc:
                 _append_log(bot_id, f"[ERROR] Failed to start process: {exc}")
                 exit_code = -1
@@ -507,12 +518,46 @@ def submit_review(job_id: str):
         return {"ok": True, "status": job["status"], "approved": approved, "rejected": rejected}
 
 
+@app.post("/api/jobs/{job_id}/abort")
+def abort_job(job_id: str):
+    with _jobs_lock:
+        if job_id not in _jobs:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if _jobs[job_id].get("status") != "running":
+            raise HTTPException(status_code=409, detail=f"Job is not running (status: {_jobs[job_id].get('status')})")
+        bot_id = _jobs[job_id].get("botId", "")
+
+    with _procs_lock:
+        proc = _procs.pop(job_id, None)
+
+    if proc is not None:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+    now = datetime.now().isoformat()
+    with _jobs_lock:
+        if job_id in _jobs:
+            _jobs[job_id]["status"] = "error"
+            _jobs[job_id]["finishedAt"] = now
+
+    if bot_id and bot_id in _locks:
+        with _locks[bot_id]:
+            if _state[bot_id].get("status") == "running":
+                _state[bot_id]["status"] = "error"
+
+    return {"ok": True, "job_id": job_id, "status": "error"}
+
+
 @app.get("/api/jobs/{job_id}/download")
 def download_job(job_id: str, format: str = Query(default="json")):
     with _jobs_lock:
         if job_id not in _jobs:
             raise HTTPException(status_code=404, detail="Job not found")
         job     = _jobs[job_id]
+        if job.get("status") != "completed":
+            raise HTTPException(status_code=403, detail="Download unavailable — HITL review must be submitted first")
         records = job.get("records", [])
         bot_id  = job.get("botId", "bot")
 
@@ -663,20 +708,6 @@ def _strip_scripts(html: str) -> str:
     return html
 
 
-@app.get("/api/html/{filename}")
-def serve_html(filename: str):
-    if ".." in filename or "/" in filename or "\\" in filename:
-        raise HTTPException(status_code=400, detail="Invalid filename")
-
-    html_path = BOT_DIR / "HTML" / filename
-    if not html_path.exists():
-        raise HTTPException(status_code=404, detail=f"HTML file not found: {filename}")
-
-    content = html_path.read_text(encoding="utf-8")
-    content = _strip_scripts(content)
-    return Response(content=content, media_type="text/html")
-
-
 # ── Live page proxy (strips X-Frame-Options / CSP so pages iframe correctly) ──
 
 import urllib.parse as _urlparse
@@ -688,6 +719,29 @@ _PROXY_UA_POOL = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:138.0) Gecko/20100101 Firefox/138.0",
 ]
+
+
+def _fetch_with_playwright(url: str) -> str | None:
+    """Use a headless Chromium browser to fully render a JS-heavy page."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return None
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            ctx = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+                viewport={"width": 1440, "height": 900},
+                locale="en-US",
+            )
+            page = ctx.new_page()
+            page.goto(url, wait_until="networkidle", timeout=30_000)
+            html = page.content()
+            browser.close()
+            return html if len(html) > 20_000 else None
+    except Exception:
+        return None
 
 
 @app.get("/api/proxy")
@@ -717,7 +771,13 @@ def proxy_live_page(url: str = Query(...)):
     except Exception:
         pass
 
-    # Fallback: serve a minimal page with a direct link to the live URL
+    # requests returned insufficient content — try Playwright for JS-rendered sites
+    pw_html = _fetch_with_playwright(url)
+    if pw_html:
+        content = _strip_scripts(pw_html)
+        return Response(content=content, media_type="text/html")
+
+    # Final fallback: serve a minimal page with a direct link to the live URL
     domain = parsed.netloc
     fallback = f"""<!DOCTYPE html>
 <html lang="en">

@@ -1,4 +1,4 @@
-import { Download, Lock } from "lucide-react";
+import { Download, Lock, X } from "lucide-react";
 import type { Job } from "@/store/platform";
 import { SOLUTIONS } from "@/data/solutions";
 
@@ -36,11 +36,13 @@ function fmtRuntime(j: Job) {
 export function JobsTable({
   jobs,
   onDownload,
+  onAbort,
   onSelect,
   showSolution = false,
 }: {
   jobs: Job[];
   onDownload: (j: Job) => void;
+  onAbort?: (j: Job) => void;
   onSelect?: (j: Job) => void;
   showSolution?: boolean;
 }) {
@@ -91,14 +93,21 @@ export function JobsTable({
                   </span>
                 </td>
                 <td className="px-3 py-2 text-right">
-                  {j.status === "success" ? (
+                  {j.status === "running" && onAbort && j.botJobId ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onAbort(j); }}
+                      className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[11px] font-mono border border-danger/40 text-danger hover:bg-danger/10 transition"
+                    >
+                      <X className="size-3" /> ABORT
+                    </button>
+                  ) : j.status === "success" && (j.reviewTotal === 0 || (j.reviewApproved ?? 0) > 0) ? (
                     <button
                       onClick={(e) => { e.stopPropagation(); onDownload(j); }}
                       className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[11px] font-mono border border-border hover:border-cyan/30 hover:text-cyan transition"
                     >
                       <Download className="size-3" /> {j.format}
                     </button>
-                  ) : j.status === "review" ? (
+                  ) : j.status === "review" || (j.status === "success" && (j.reviewTotal ?? 0) > 0 && (j.reviewApproved ?? 0) === 0) ? (
                     <span className="inline-flex items-center gap-1 h-7 px-2 rounded text-[10px] font-mono border border-amber/30 text-amber bg-amber/5">
                       <Lock className="size-3" /> LOCKED
                     </span>

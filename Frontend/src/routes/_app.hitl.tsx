@@ -1,4 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+
+const BOT_API = typeof window !== "undefined"
+  ? `http://${window.location.hostname}:8000`
+  : "http://localhost:8000";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   Check, X, ClipboardCheck, Filter, FileText, Globe,
@@ -64,7 +68,7 @@ function HitlPage() {
           // Also tell the backend if this is a real bot job
           const backendJobId = openBatch.job.botJobId;
           if (backendJobId) {
-            fetch(`http://localhost:8000/api/jobs/${backendJobId}/hitl/${id}?status=${status}`, { method: "PATCH" }).catch(() => {});
+            fetch(`${BOT_API}/api/jobs/${backendJobId}/hitl/${id}?status=${status}`, { method: "PATCH" }).catch(() => {});
           }
         }}
         onComplete={() => {
@@ -72,7 +76,7 @@ function HitlPage() {
           // Notify backend
           const backendJobId = openBatch.job.botJobId;
           if (backendJobId) {
-            fetch(`http://localhost:8000/api/jobs/${backendJobId}/submit-review`, { method: "POST" }).catch(() => {});
+            fetch(`${BOT_API}/api/jobs/${backendJobId}/submit-review`, { method: "POST" }).catch(() => {});
           }
           setOpenJobId(null);
         }}
@@ -490,8 +494,8 @@ function ValidationScreen({
               setCtxMenu({ x: e.clientX, y: e.clientY, text });
             }}
           >
-            <div style={{ zoom: item.htmlFile ? undefined : `${zoom}%` }} className="transition-all">
-              {item.htmlFile && view === "html" ? (
+            <div style={{ zoom: item.liveUrl ? undefined : `${zoom}%` }} className="transition-all">
+              {item.liveUrl && view === "html" ? (
                 <BotHtmlViewer
                   key={item.id}
                   item={item}
@@ -1005,21 +1009,17 @@ function BotHtmlViewer({
   // Pass iframe element up so parent can postMessage to it
   useEffect(() => { onIframe(iframeRef.current); }, [loaded]); // eslint-disable-line
 
-  // Fetch + inject on item change — prefer live proxy, fall back to saved HTML
+  // Fetch + inject on item change — always use live proxy
   useEffect(() => {
     setLoaded(false);
     setSrcdoc("");
-    const sourceUrl = item.liveUrl
-      ? `http://localhost:8000/api/proxy?url=${encodeURIComponent(item.liveUrl)}`
-      : item.htmlFile
-      ? `http://localhost:8000/api/html/${encodeURIComponent(item.htmlFile)}`
-      : null;
-    if (!sourceUrl) return;
+    if (!item.liveUrl) return;
+    const sourceUrl = `${BOT_API}/api/proxy?url=${encodeURIComponent(item.liveUrl)}`;
     fetch(sourceUrl)
       .then((r) => r.text())
       .then((html) => setSrcdoc(injectAnnotationLayer(html)))
       .catch(() => setSrcdoc(`<html><body style="font-family:sans-serif;padding:20px;color:#666"><p>Could not load source page.</p></body></html>`));
-  }, [item.htmlFile, item.liveUrl, item.id]);
+  }, [item.liveUrl, item.id]);
 
   // Send highlights when iframe is ready or fields change
   useEffect(() => {
@@ -1040,7 +1040,7 @@ function BotHtmlViewer({
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2 px-2 py-1 rounded border border-cyan/30 bg-cyan/5 text-[10px] font-mono text-cyan">
         <Globe className="size-3" />
-        <span className="truncate">{item.liveUrl ?? item.htmlFile}</span>
+        <span className="truncate">{item.liveUrl}</span>
         {item.uid && <span className="ml-auto shrink-0 text-muted-foreground">UID: {item.uid}</span>}
         {item.liveUrl && (
           <a
@@ -1057,12 +1057,12 @@ function BotHtmlViewer({
       {srcdoc ? (
         <iframe
           ref={iframeRef}
-          key={`${item.id}-${item.htmlFile}`}
-          srcdoc={srcdoc}
-          title={item.recordName ?? item.htmlFile ?? "source"}
+          key={item.id}
+          srcDoc={srcdoc}
+          title={item.recordName ?? "source"}
           className="w-full border border-border rounded"
           style={{ height: "66vh", background: "#171a20" }}
-          sandbox="allow-scripts allow-same-origin"
+          sandbox="allow-scripts"
           onLoad={() => { setLoaded(true); onIframe(iframeRef.current); }}
         />
       ) : (

@@ -1,5 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+
+// Derive backend base URL from the current hostname so LAN / remote access works
+const BOT_API = typeof window !== "undefined"
+  ? `http://${window.location.hostname}:8000`
+  : "http://localhost:8000";
+import { useMemo, useState, useEffect, useRef } from "react";
 import {
   ArrowLeft, Check, Plus, FileDown, Sparkles, Database, Workflow, Inbox,
   Play, Globe, Settings2, Boxes, GitBranch, Send, ListChecks, Eye,
@@ -41,7 +46,7 @@ function SolutionDetail() {
   const solution = getSolution(id);
   const [tab, setTab] = useState<Tab>(tabParam ?? "sources");
   const [openInsight, setOpenInsight] = useState<NewsInsight | null>(null);
-  const [openJob, setOpenJob] = useState<Job | null>(null);
+  const [openJobId, setOpenJobId] = useState<string | null>(null);
 
   const subscribed = usePlatform((s) => s.subscriptions.includes(solution?.id ?? "vehicle-spec"));
   const toggleSub = usePlatform((s) => s.toggleSubscription);
@@ -50,6 +55,9 @@ function SolutionDetail() {
   const updateJob = usePlatform((s) => s.updateJob);
   const addHitl = usePlatform((s) => s.addHitl);
   const addFeedback = usePlatform((s) => s.addFeedback);
+
+  // Live lookup — always reflects latest Zustand state, never a stale snapshot
+  const openJob = useMemo(() => openJobId ? allJobs.find((j) => j.id === openJobId) ?? null : null, [openJobId, allJobs]);
 
   if (!solution) {
     return (
@@ -62,8 +70,6 @@ function SolutionDetail() {
 
   const workflows = getWorkflowsFor(solution.id);
   const jobs = allJobs.filter((j) => j.solutionId === solution.id);
-
-  const BOT_API = "http://localhost:8000";
 
   // Map source script name → backend bot_id
   const sourceToBotId = (script?: string): string | null => {
@@ -95,8 +101,7 @@ function SolutionDetail() {
       setTab("jobs");
 
       try {
-        // Tesla bot uses cached output (today's downloaded pages) so HITL loads instantly
-        const useCached = botId === "tesla-configurator";
+        const useCached = false;
         let res = await fetch(`${BOT_API}/api/bots/${botId}/run?use_cached=${useCached}`, { method: "POST" });
         // 409 = previous run left the bot stuck in "running" — force-reset and retry once
         if (res.status === 409) {
@@ -118,9 +123,9 @@ function SolutionDetail() {
 
             if (backendJob.status !== "running") {
               clearInterval(poll);
-              const frontendStatus = backendJob.status === "review" ? "review"
-                : backendJob.status === "completed"                  ? "success"
-                : "failed";
+              // "success" is ONLY set by completeJobReview after HITL approval.
+              // Map backend "completed" (0-record run) and "error" to "failed" here.
+              const frontendStatus = backendJob.status === "review" ? "review" : "failed";
               const finishedAt = backendJob.finishedAt ?? new Date().toISOString();
               const runtimeMs = backendJob.runtimeMs
                 ?? (new Date(finishedAt).getTime() - new Date(jobStartedAt).getTime());
@@ -231,6 +236,15 @@ function SolutionDetail() {
     });
   };
 
+  const handleAbort = async (j: Job) => {
+    updateJob(j.id, { status: "failed", finishedAt: new Date().toISOString() });
+    if (j.botJobId) {
+      try {
+        await fetch(`${BOT_API}/api/jobs/${j.botJobId}/abort`, { method: "POST" });
+      } catch { /* ignore */ }
+    }
+  };
+
   const handleDownload = async (j: Job, fmt?: "csv" | "json") => {
     // Real bot jobs: download from backend
     if (j.botJobId) {
@@ -249,8 +263,13 @@ function SolutionDetail() {
         URL.revokeObjectURL(objUrl);
         return;
       }
+      // Bot job download blocked by backend — do NOT fall back to sample data
+      if (res.status === 403) {
+        alert("Download is locked until HITL review is submitted. Go to the Review tab to approve this job.");
+      }
+      return;
     }
-    // Fallback: use sample data
+    // Fallback: use sample data (non-bot / seeded jobs only)
     const cols = solution.sampleColumns;
     const rows = solution.sampleRows;
     const base = `${solution.id}-${j.source.toLowerCase().replace(/\s+/g, "-")}-${j.id.slice(0, 6)}`;
@@ -352,7 +371,7 @@ function SolutionDetail() {
       )}
 
       {tab === "jobs" && (
-        <JobsTable jobs={jobs} onDownload={handleDownload} onSelect={setOpenJob} />
+        <JobsTable jobs={jobs} onDownload={handleDownload} onAbort={handleAbort} onSelect={(j) => setOpenJobId(j.id)} />
       )}
 
       {tab === "review" && (
@@ -395,7 +414,7 @@ function SolutionDetail() {
       )}
 
       <InsightDetailModal insight={openInsight} onClose={() => setOpenInsight(null)} />
-      {openJob && <JobDrawer job={openJob} onClose={() => setOpenJob(null)} onDownload={handleDownload} onFeedback={(rating, message) => addFeedback({ id: generateId(), solutionId: solution.id, workflow: openJob.workflow, jobId: openJob.id, rating, message, createdAt: new Date().toISOString() })} />}
+      {openJob && <JobDrawer job={openJob} onClose={() => setOpenJobId(null)} onDownload={handleDownload} onAbort={() => { handleAbort(openJob); setOpenJobId(null); }} onFeedback={(rating, message) => addFeedback({ id: generateId(), solutionId: solution.id, workflow: openJob.workflow, jobId: openJob.id, rating, message, createdAt: new Date().toISOString() })} />}
     </div>
   );
 }
@@ -970,9 +989,45 @@ function IntegrationLinkDrawer({
 
 // =========================== Job drawer (per-solution) ===========================
 
-function JobDrawer({ job, onClose, onDownload, onFeedback }: { job: Job; onClose: () => void; onDownload: (j: Job) => void; onFeedback: (rating: "up" | "down", message: string) => void }) {
+function JobDrawer({ job, onClose, onDownload, onAbort, onFeedback }: { job: Job; onClose: () => void; onDownload: (j: Job) => void; onAbort?: () => void; onFeedback: (rating: "up" | "down", message: string) => void }) {
   const [fb, setFb] = useState("");
   const [sent, setSent] = useState<null | "up" | "down">(null);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [logError, setLogError] = useState<string | null>(null);
+  const logEndRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!job.botId) return;
+    setLogs([]);
+    setLogError(null);
+    const fetchLogs = async () => {
+      try {
+        const res = await fetch(`${BOT_API}/api/bots/${job.botId}/status?last_n=500`);
+        if (!res.ok) {
+          setLogError(`Backend returned ${res.status}`);
+          return;
+        }
+        const data = await res.json();
+        setLogs(data.recent_logs ?? []);
+        setLogError(null);
+        if (data.status !== "running" && pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      } catch {
+        setLogError(`Cannot reach backend at ${BOT_API}`);
+      }
+    };
+    fetchLogs();
+    pollRef.current = setInterval(fetchLogs, 1500);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [job.botId]);
+
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
+
   return (
     <div className="fixed inset-0 z-50 bg-background/60 backdrop-blur-sm flex justify-end" onClick={onClose}>
       <div className="w-full max-w-xl h-full bg-card border-l border-border overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -1001,31 +1056,81 @@ function JobDrawer({ job, onClose, onDownload, onFeedback }: { job: Job; onClose
             </div>
           )}
           <div>
-            <div className="text-[10px] font-mono tracking-widest text-muted-foreground mb-2">PIPELINE LOG</div>
-            <ol className="space-y-1">
-              {(job.steps ?? []).map((s, i) => (
-                <li key={i} className="flex items-start gap-3 p-2 rounded border border-border">
-                  {s.status === "ok" && <CheckCircle2 className="size-4 text-success shrink-0 mt-0.5" />}
-                  {s.status === "running" && <Loader2 className="size-4 text-cyan shrink-0 mt-0.5 animate-spin" />}
-                  {s.status === "fail" && <AlertCircle className="size-4 text-danger shrink-0 mt-0.5" />}
-                  {s.status === "pending" && <Circle className="size-4 text-muted-foreground shrink-0 mt-0.5" />}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">{s.name}</span>
-                      <span className="font-mono text-[10px] text-muted-foreground">{s.ts}</span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[10px] font-mono tracking-widest text-muted-foreground">PIPELINE LOG</div>
+              {job.status === "running" && job.botId && (
+                <span className="flex items-center gap-1 text-[10px] font-mono text-cyan">
+                  <Loader2 className="size-3 animate-spin" /> LIVE
+                </span>
+              )}
+            </div>
+            {job.botId ? (
+              <div className="rounded border border-border bg-[#0a0a0a] overflow-hidden">
+                <div
+                  className="h-64 overflow-y-auto p-3 font-mono text-[11px] leading-relaxed space-y-px"
+                  style={{ scrollbarWidth: "thin", scrollbarColor: "#333 transparent" }}
+                >
+                  {logError ? (
+                    <span className="text-danger/70">{logError} — is the backend running?</span>
+                  ) : logs.length === 0 ? (
+                    <span className="text-muted-foreground/50">Waiting for log output…</span>
+                  ) : (
+                    logs.map((line, i) => {
+                      const isError = /\[ERROR\]/i.test(line);
+                      const isWarn  = /\[WARN\]/i.test(line);
+                      const isInfo  = /\[INFO\]/i.test(line);
+                      return (
+                        <div
+                          key={i}
+                          className={
+                            isError ? "text-danger" :
+                            isWarn  ? "text-amber" :
+                            isInfo  ? "text-cyan/80" :
+                            "text-muted-foreground"
+                          }
+                        >
+                          {line}
+                        </div>
+                      );
+                    })
+                  )}
+                  <div ref={logEndRef} />
+                </div>
+                <div className="border-t border-border px-3 py-1.5 flex items-center justify-between text-[10px] font-mono text-muted-foreground/60">
+                  <span>{logs.length} lines</span>
+                  {job.botId && <span className="uppercase tracking-wider">{job.botId}</span>}
+                </div>
+              </div>
+            ) : (
+              <ol className="space-y-1">
+                {(job.steps ?? []).map((s, i) => (
+                  <li key={i} className="flex items-start gap-3 p-2 rounded border border-border">
+                    {s.status === "ok" && <CheckCircle2 className="size-4 text-success shrink-0 mt-0.5" />}
+                    {s.status === "running" && <Loader2 className="size-4 text-cyan shrink-0 mt-0.5 animate-spin" />}
+                    {s.status === "fail" && <AlertCircle className="size-4 text-danger shrink-0 mt-0.5" />}
+                    {s.status === "pending" && <Circle className="size-4 text-muted-foreground shrink-0 mt-0.5" />}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">{s.name}</span>
+                        <span className="font-mono text-[10px] text-muted-foreground">{s.ts}</span>
+                      </div>
+                      {s.note && <div className="text-[11px] text-muted-foreground mt-0.5">{s.note}</div>}
                     </div>
-                    {s.note && <div className="text-[11px] text-muted-foreground mt-0.5">{s.note}</div>}
-                  </div>
-                </li>
-              ))}
-              {(!job.steps || job.steps.length === 0) && <li className="text-xs text-muted-foreground">No step log captured.</li>}
-            </ol>
+                  </li>
+                ))}
+                {(!job.steps || job.steps.length === 0) && <li className="text-xs text-muted-foreground">No step log captured.</li>}
+              </ol>
+            )}
           </div>
-          {job.status === "success" ? (
+          {job.status === "running" && onAbort ? (
+            <button onClick={onAbort} className="w-full h-9 rounded border border-danger/40 text-danger text-xs font-mono flex items-center justify-center gap-1.5 hover:bg-danger/10 transition">
+              <X className="size-3.5" /> ABORT JOB
+            </button>
+          ) : job.status === "success" && (job.reviewTotal === 0 || (job.reviewApproved ?? 0) > 0) ? (
             <button onClick={() => onDownload(job)} className="w-full h-9 rounded bg-cyan text-background text-xs font-mono flex items-center justify-center gap-1.5">
               <FileDown className="size-3.5" /> DOWNLOAD {job.format}
             </button>
-          ) : job.status === "review" ? (
+          ) : job.status === "review" || (job.status === "success" && (job.reviewTotal ?? 0) > 0 && (job.reviewApproved ?? 0) === 0) ? (
             <Link to="/hitl" className="w-full h-9 rounded bg-amber/15 border border-amber/40 text-amber text-xs font-mono flex items-center justify-center gap-1.5">
               <Lock className="size-3.5" /> DOWNLOAD LOCKED · OPEN REVIEW ({job.reviewApproved ?? 0}/{job.reviewTotal ?? 0})
             </Link>

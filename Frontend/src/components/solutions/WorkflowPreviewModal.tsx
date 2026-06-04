@@ -1,16 +1,20 @@
 import { X } from "lucide-react";
 import type { Workflow } from "@/store/platform";
 import { WorkflowDiagram } from "./WorkflowDiagram";
-import multipleSources from "@/assets/workflows/multiple-sources.png";
+import multipleSources  from "@/assets/workflows/multiple-sources.png";
 import automotiveRepair from "@/assets/workflows/automotive-repair.png";
-import oemImg from "@/assets/workflows/oem.png";
-import teslaImg from "@/assets/workflows/tesla.png";
-import bmwImg from "@/assets/workflows/bmw.png";
+import oemImg           from "@/assets/workflows/oem.png";
+import teslaImg         from "@/assets/workflows/tesla.png";
+import bmwImg           from "@/assets/workflows/bmw.png";
+import evImg            from "@/assets/workflows/ev-workflow.png";
+import inventoryImg     from "@/assets/workflows/inventory-workflow.png";
 
 /** Workflows that show a real reference screenshot instead of the generated SVG. */
 const WORKFLOW_IMAGES: Record<string, { src: string; alt: string }> = {
+  "w-ev-1":   { src: evImg,            alt: "EV charging network workflow" },
+  "w-mfg-1":  { src: inventoryImg,     alt: "Plant operations inventory workflow" },
   "w-news-1": { src: multipleSources,   alt: "Multi-source predictive insights pipeline" },
-  "w-mfg-1":  { src: automotiveRepair,  alt: "Plant operations PDF/HTML extraction pipeline" },
+  "w-mfg-2":  { src: automotiveRepair,  alt: "Plant operations PDF/HTML extraction pipeline" },
   "w-cfg-1":  { src: oemImg,            alt: "OEM configurator extraction pipeline" },
   "w-cfg-2":  { src: teslaImg,          alt: "Tesla configurator pricing delta workflow" },
   "w-cfg-3":  { src: bmwImg,            alt: "BMW configurator launch watch workflow" },

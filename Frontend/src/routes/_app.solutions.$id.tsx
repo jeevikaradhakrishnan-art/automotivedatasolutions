@@ -100,6 +100,7 @@ function SolutionDetail() {
         updateJob(localJobId, { botJobId: backendJobId });
 
         // Poll backend until job leaves running state
+        const jobStartedAt = new Date().toISOString();
         const poll = setInterval(async () => {
           try {
             const statusRes = await fetch(`${BOT_API}/api/jobs/${backendJobId}`);
@@ -111,9 +112,13 @@ function SolutionDetail() {
               const frontendStatus = backendJob.status === "review" ? "review"
                 : backendJob.status === "completed"                  ? "success"
                 : "failed";
+              const finishedAt = backendJob.finishedAt ?? new Date().toISOString();
+              const runtimeMs = backendJob.runtimeMs
+                ?? (new Date(finishedAt).getTime() - new Date(jobStartedAt).getTime());
               updateJob(localJobId, {
                 status:          frontendStatus,
-                finishedAt:      backendJob.finishedAt ?? new Date().toISOString(),
+                finishedAt,
+                runtimeMs,
                 rowsProduced:    backendJob.rowsProduced ?? 0,
                 reviewTotal:     backendJob.reviewTotal ?? 0,
                 reviewApproved:  0,
@@ -349,36 +354,34 @@ function SolutionDetail() {
       {tab === "integrations" && <IntegrationsTab solutionId={solution.id} workflows={workflows} />}
 
       {tab === "insights" && solution.hasInsights && (
-        <div className="space-y-3">
-          {solution.id === "news" ? (
-            <div className="grid md:grid-cols-2 gap-3">
-              {insights.map((ins) => (
-                <button key={ins.id} onClick={() => setOpenInsight(ins)} className="panel p-4 text-left hover:border-cyan/40 transition">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-mono tracking-widest text-muted-foreground">{ins.cluster.toUpperCase()}</span>
-                    <div className="flex gap-1">
-                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-                        ins.impact === "High" ? "border-danger/40 text-danger bg-danger/10" :
-                        ins.impact === "Medium" ? "border-amber/40 text-amber bg-amber/10" :
-                        "border-success/40 text-success bg-success/10"
-                      }`}>{ins.impact.toUpperCase()}</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border text-muted-foreground">
-                        {ins.confidence}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-sm font-medium leading-snug">{ins.headline}</div>
-                  <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{ins.executiveSummary}</p>
-                  <div className="mt-3 text-[11px] text-cyan font-mono">VIEW DETAILS →</div>
-                </button>
-              ))}
+        solution.id === "news" ? (
+          <div className="flex flex-col gap-2" style={{ height: "calc(100vh - 220px)", minHeight: 520 }}>
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[10px] font-mono tracking-widest text-muted-foreground">
+                PREDICTIVE INSIGHTS · ANALYSIS DASHBOARD
+              </span>
+              <a
+                href="http://3.7.204.198:3000/analysis"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[11px] font-mono text-cyan hover:underline flex items-center gap-1"
+              >
+                Open in new tab ↗
+              </a>
             </div>
-          ) : (
-            <div className="panel p-6 text-sm text-muted-foreground">
-              AI-generated strategic insights surface here once jobs have been run.
-            </div>
-          )}
-        </div>
+            <iframe
+              src="http://3.7.204.198:3000/analysis"
+              title="Predictive Insights Analysis"
+              className="flex-1 w-full rounded border border-border"
+              style={{ minHeight: 480 }}
+              allow="fullscreen"
+            />
+          </div>
+        ) : (
+          <div className="panel p-6 text-sm text-muted-foreground">
+            AI-generated strategic insights surface here once jobs have been run.
+          </div>
+        )
       )}
 
       <InsightDetailModal insight={openInsight} onClose={() => setOpenInsight(null)} />

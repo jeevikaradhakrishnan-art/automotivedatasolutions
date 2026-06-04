@@ -17,11 +17,20 @@ const statusLabel: Record<Job["status"], string> = {
   failed: "FAILED",
 };
 
-function fmtRuntime(ms?: number) {
-  if (!ms) return "—";
+function fmtMs(ms: number) {
   if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
   const m = Math.floor(ms / 60_000), s = Math.round((ms % 60_000) / 1000);
   return `${m}m ${s}s`;
+}
+
+function fmtRuntime(j: Job) {
+  if (j.runtimeMs) return fmtMs(j.runtimeMs);
+  if (j.finishedAt && j.startedAt) {
+    const ms = new Date(j.finishedAt).getTime() - new Date(j.startedAt).getTime();
+    if (ms > 0) return fmtMs(ms);
+  }
+  if (j.status === "running") return "Running…";
+  return "—";
 }
 
 export function JobsTable({
@@ -73,7 +82,7 @@ export function JobsTable({
                   <div className="text-[10px] font-mono text-muted-foreground truncate max-w-[260px]">{j.source}</div>
                 </td>
                 <td className="px-3 py-2 font-mono text-muted-foreground">{new Date(j.startedAt).toLocaleTimeString()}</td>
-                <td className="px-3 py-2 font-mono">{fmtRuntime(j.runtimeMs)}</td>
+                <td className="px-3 py-2 font-mono">{fmtRuntime(j)}</td>
                 <td className="px-3 py-2 font-mono">{j.rowsProduced ?? "—"}</td>
                 <td className="px-3 py-2 font-mono text-[11px]">{reviewLabel}</td>
                 <td className="px-3 py-2">

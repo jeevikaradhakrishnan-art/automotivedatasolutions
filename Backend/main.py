@@ -69,83 +69,115 @@ def _append_log(bot_id: str, line: str) -> None:
 def _hitl_fields_tesla(record: dict) -> list[dict]:
     """
     Build HITL field list from a tesla_data_extractor.py output record.
-    Also handles tesla_live_extractor.py flat format as fallback.
+    Handles both the new multi-page format (Model Y India / Model 3 / Cybertruck)
+    and the legacy single-trim format.
     """
-    trim = record.get("trim", {})
-    trim_name  = trim.get("name",  "") if isinstance(trim, dict) else str(trim)
-    trim_price = trim.get("price", "") if isinstance(trim, dict) else ""
+    uid_val  = record.get("uid", "") or record.get("UID", "")
+    country  = record.get("Country", "") or record.get("country", "USA")
+    currency = record.get("Currency", "") or record.get("currency", "$")
+    model    = record.get("model", "")
+    region   = record.get("region", country)
 
-    # Fallback to flat-format fields (tesla_live_extractor.py)
-    trim_price = trim_price or record.get("price_cash", "")
+    # ── New multi-page format ─────────────────────────────────────────────
+    if "base_price" in record or "trims" in record:
+        trims    = record.get("trims", [])
+        base     = trims[0] if trims else {}
+        colors   = record.get("colors", [])
+        wheels   = record.get("wheels", [])
+        interior = record.get("interior", [])
 
-    # pricing dict (original script has cash/lease/finance breakdown)
+        fields = [
+            # identity
+            {"group": "vehicle",  "name": "Brand",        "value": record.get("Brand", "Tesla"),    "confidence": 100},
+            {"group": "vehicle",  "name": "Model",         "value": model,                           "confidence": 100},
+            {"group": "vehicle",  "name": "Region",        "value": region,                          "confidence": 100},
+            {"group": "vehicle",  "name": "Trim variants", "value": record.get("trim_count", str(len(trims))), "confidence": 100},
+            # pricing
+            {"group": "pricing",  "name": "Base price",    "value": record.get("base_price", base.get("price", "")),  "confidence": 98},
+            {"group": "pricing",  "name": "Currency",      "value": currency,                        "confidence": 100},
+            {"group": "pricing",  "name": "Price date",    "value": record.get("Creation date", ""), "confidence": 100},
+            # specs — base trim
+            {"group": "specs",    "name": "Range",         "value": record.get("range", base.get("range", "")),       "confidence": 95},
+            {"group": "specs",    "name": "Range (converted)", "value": record.get("range_converted", base.get("range_km", base.get("range_mi", ""))), "confidence": 95},
+            {"group": "specs",    "name": "Acceleration",  "value": record.get("acceleration", base.get("accel", "")), "confidence": 95},
+            {"group": "specs",    "name": "Top Speed",     "value": record.get("top_speed", base.get("top_speed", "")), "confidence": 90},
+            {"group": "specs",    "name": "Peak Power",    "value": record.get("horsepower", base.get("horsepower", "")), "confidence": 88},
+            {"group": "specs",    "name": "Drivetrain",    "value": record.get("drivetrain", base.get("drivetrain", "")), "confidence": 88},
+            {"group": "specs",    "name": "Seating",       "value": record.get("seating", ""),       "confidence": 100},
+            {"group": "specs",    "name": "Cargo",         "value": record.get("cargo", ""),          "confidence": 90},
+            # options summary
+            {"group": "options",  "name": "Color options", "value": ", ".join(c["name"] for c in colors[:4]) if colors else "", "confidence": 92},
+            {"group": "options",  "name": "Wheel options", "value": ", ".join(w["name"] for w in wheels[:3]) if wheels else "", "confidence": 92},
+            {"group": "options",  "name": "Interior options", "value": ", ".join(i["name"] for i in interior[:3]) if interior else "", "confidence": 92},
+            # features
+            {"group": "features", "name": "Autopilot",    "value": record.get("autopilot", ""),      "confidence": 100},
+            {"group": "features", "name": "Charge time",  "value": record.get("charge_time", ""),    "confidence": 88},
+            # extra specs (Cybertruck)
+            {"group": "specs",    "name": "Towing",        "value": record.get("towing", base.get("towing", "")),     "confidence": 90},
+            {"group": "specs",    "name": "Payload",       "value": record.get("payload", base.get("payload", "")),   "confidence": 90},
+            {"group": "specs",    "name": "Ground clearance", "value": record.get("ground_clearance", ""),            "confidence": 88},
+            {"group": "specs",    "name": "Body material", "value": record.get("body_material", ""),                  "confidence": 100},
+            {"group": "specs",    "name": "Vault length",  "value": record.get("vault_length", ""),                   "confidence": 100},
+            # meta
+            {"group": "location", "name": "Country",      "value": country,                          "confidence": 100},
+            {"group": "meta",     "name": "UID",           "value": uid_val,                          "confidence": 100},
+            {"group": "meta",     "name": "Source URL",    "value": record.get("configurator_url", ""), "confidence": 100},
+        ]
+        # Also add individual trim entries
+        for t in trims[1:]:
+            fields.append({
+                "group": "trims",
+                "name": t.get("name", "Trim"),
+                "value": f"{t.get('price','')} · {t.get('range', t.get('range_km',''))} · {t.get('accel','')}",
+                "confidence": 95,
+            })
+        return [f for f in fields if f["value"]]
+
+    # ── Legacy single-trim format ─────────────────────────────────────────
+    trim       = record.get("trim", {})
+    trim_name  = trim.get("name", "") if isinstance(trim, dict) else str(trim)
+    trim_price = (trim.get("price", "") if isinstance(trim, dict) else "") or record.get("price_cash", "")
     pricing    = record.get("pricing", {}) if isinstance(record.get("pricing"), dict) else {}
     cash_price = (pricing.get("cash") or {}).get("price", "") or trim_price
-    lease      = pricing.get("lease", {})  or {}
+    lease      = pricing.get("lease", {}) or {}
     finance    = pricing.get("finance", {}) or {}
+    tech       = record.get("Technical Data", {}) if isinstance(record.get("Technical Data"), dict) else {}
 
-    # Technical Data dict (original script populates this from spec-page tabs)
-    tech = record.get("Technical Data", {}) if isinstance(record.get("Technical Data"), dict) else {}
-
-    # Specs — original script fields first, live-extractor flat fields as fallback
-    range_val  = record.get("Range (est.)",           "") or record.get("range_mi",    "")
+    range_val  = record.get("Range (est.)", "") or record.get("range_mi", "")
     range_conv = record.get("Range (est.)_Converted", "")
-    accel      = record.get("0-60 mph",               "") or record.get("acceleration", "")
-    top_spd    = record.get("Top Speed",              "") or record.get("top_speed",    "")
-    top_conv   = record.get("Top Speed_Converted",    "")
-    country    = record.get("Country",  "") or record.get("country",  "USA")
-    currency   = record.get("Currency", "") or record.get("currency", "$")
-    price_date = record.get("Price date", "") or record.get("Creation date", "")
-    uid_val    = record.get("uid", "") or record.get("UID", "")
+    accel      = record.get("0-60 mph", "") or record.get("acceleration", "")
+    top_spd    = record.get("Top Speed", "") or record.get("top_speed", "")
 
-    # Technical Data values — original script nests under "Performance ..." prefix
     def _td(key: str) -> str:
         return tech.get(f"Performance {key}", "") or tech.get(key, "")
 
-    peak_pwr   = _td("Peak Power")   or record.get("horsepower",  "")
-    battery    = _td("Battery")      or record.get("battery_kwh", "")
-    drivetrain = _td("Drivetrain")   or record.get("drivetrain",  "")
-
     fields = [
-        # ── Vehicle identity ────────────────────────────────────────────────
         {"group": "vehicle",  "name": "Brand",      "value": record.get("Brand", "Tesla"), "confidence": 100},
-        {"group": "vehicle",  "name": "model",      "value": record.get("model", ""),      "confidence": 100},
+        {"group": "vehicle",  "name": "model",      "value": model,                        "confidence": 100},
         {"group": "vehicle",  "name": "trim",       "value": trim_name,                    "confidence": 100},
-        # ── Pricing ─────────────────────────────────────────────────────────
         {"group": "pricing",  "name": "Cash price", "value": cash_price,                   "confidence": 98},
         {"group": "pricing",  "name": "Currency",   "value": currency,                     "confidence": 100},
-        {"group": "pricing",  "name": "Price date", "value": price_date,                   "confidence": 100},
-        # ── Specs ────────────────────────────────────────────────────────────
-        {"group": "specs",    "name": "Range (est.)",           "value": range_val,        "confidence": 95},
-        {"group": "specs",    "name": "Range (est.)_Converted", "value": range_conv,       "confidence": 95},
-        {"group": "specs",    "name": "0-60 mph",               "value": accel,            "confidence": 95},
-        {"group": "specs",    "name": "Top Speed",              "value": top_spd,          "confidence": 90},
-        {"group": "specs",    "name": "Top Speed_Converted",    "value": top_conv,         "confidence": 90},
-        {"group": "specs",    "name": "Peak Power",             "value": peak_pwr,         "confidence": 88},
-        {"group": "specs",    "name": "Battery",                "value": battery,          "confidence": 88},
-        {"group": "specs",    "name": "Drivetrain",             "value": drivetrain,       "confidence": 88},
-        # ── Location / meta ──────────────────────────────────────────────────
+        {"group": "specs",    "name": "Range",      "value": range_val,                    "confidence": 95},
+        {"group": "specs",    "name": "Range (converted)", "value": range_conv,            "confidence": 95},
+        {"group": "specs",    "name": "0-60 mph",   "value": accel,                        "confidence": 95},
+        {"group": "specs",    "name": "Top Speed",  "value": top_spd,                      "confidence": 90},
+        {"group": "specs",    "name": "Peak Power", "value": _td("Peak Power") or record.get("horsepower", ""), "confidence": 88},
+        {"group": "specs",    "name": "Drivetrain", "value": _td("Drivetrain") or record.get("drivetrain", ""), "confidence": 88},
         {"group": "location", "name": "Country",    "value": country,                      "confidence": 100},
         {"group": "meta",     "name": "UID",        "value": uid_val,                      "confidence": 100},
     ]
-
-    # Lease breakdown (original script extracts these)
     if lease.get("price"):
         fields += [
-            {"group": "lease", "name": "Lease price",         "value": lease.get("price", ""),         "confidence": 92},
-            {"group": "lease", "name": "Lease down payment",  "value": lease.get("Down Payment", ""),  "confidence": 90},
-            {"group": "lease", "name": "Lease term",          "value": lease.get("Term", ""),          "confidence": 90},
-            {"group": "lease", "name": "Lease annual miles",  "value": lease.get("Annual Miles", ""),  "confidence": 90},
+            {"group": "lease", "name": "Lease price",        "value": lease.get("price", ""),        "confidence": 92},
+            {"group": "lease", "name": "Lease down payment", "value": lease.get("Down Payment", ""), "confidence": 90},
+            {"group": "lease", "name": "Lease term",         "value": lease.get("Term", ""),         "confidence": 90},
         ]
-    # Finance breakdown
     if finance.get("price"):
         fields += [
-            {"group": "finance", "name": "Finance price",        "value": finance.get("price", ""),          "confidence": 92},
-            {"group": "finance", "name": "Finance down payment", "value": finance.get("Down Payment", ""),   "confidence": 90},
-            {"group": "finance", "name": "Finance term",         "value": finance.get("Term", ""),           "confidence": 90},
-            {"group": "finance", "name": "Est APR",              "value": finance.get("Est APR%", ""),       "confidence": 88},
+            {"group": "finance", "name": "Finance price",        "value": finance.get("price", ""),        "confidence": 92},
+            {"group": "finance", "name": "Finance down payment", "value": finance.get("Down Payment", ""), "confidence": 90},
+            {"group": "finance", "name": "Est APR",              "value": finance.get("Est APR%", ""),     "confidence": 88},
         ]
-
     return fields
 
 

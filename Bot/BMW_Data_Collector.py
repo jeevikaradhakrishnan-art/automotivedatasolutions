@@ -738,7 +738,7 @@ if __name__ == '__main__':
     os.makedirs(output_path, exist_ok=True)
     all_records = []
     uid_counter = 1
-    MAX_RECORDS = 3
+    MAX_RECORDS = 5
     sess = requests.Session()
     sess.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36'
     models_url = 'https://www.bmw.co.uk/en/all-models.html'
@@ -754,7 +754,7 @@ if __name__ == '__main__':
         with open(all_models_path, 'wb') as fh:
             fh.write(obj.content)
         obj_text = obj.text
-        time.sleep(random.randint(1, 3))
+        time.sleep(random.uniform(0.3, 0.8))
     soup = BeautifulSoup(obj_text, 'html.parser')
     car_soup = soup.find("div", attrs={"cmp-allmodels--container "})
     counter = 0
@@ -923,8 +923,8 @@ if __name__ == '__main__':
                         elif model_info.get("Fuel Type") ==  "Diesel" or model_info.get("Fuel Type") == "D":
                             sub_technical_block_json = extract_diesel_data(price_data)
                         else:
-                            print("New Model was found..")
-                            input(model_info.get("Fuel Type"))
+                            print(f"[WARN] Unknown fuel type '{model_info.get('Fuel Type')}' for {model_code} — skipping")
+                            continue
                         print(f"Line Code: {line_code}")
                         sub_technical_block = sub_technical_block_json.get(model_code,{})
                         if line_code == None:
@@ -955,7 +955,7 @@ if __name__ == '__main__':
                             with open(paint_details_path, 'r', encoding="utf-8") as fh:
                                 paint_data = json.load(fh)
                         else:
-                            time.sleep(random.randint(1, 3))
+                            time.sleep(random.uniform(0.3, 0.8))
                             obj = sess.get(paint_detail_url,
                                            headers=headers, verify=False)
                             with open(f'{html_path}{model_name_cleaned}_Paint_Details.json', 'wb') as fh:
@@ -995,7 +995,7 @@ if __name__ == '__main__':
                                 data = json.load(fh)
 
                         else:
-                            time.sleep(random.randint(1, 3))
+                            time.sleep(random.uniform(0.3, 0.8))
                             obj = sess.get(standard_equipment_url,
                                            headers=headers, verify=False)
                             with open(standard_equipment_path, 'wb') as fh:
@@ -1031,7 +1031,7 @@ if __name__ == '__main__':
                             with open(filter_accessories_path, 'r', encoding="utf-8") as fh:
                                 filter_json = json.load(fh)
                         else:
-                            time.sleep(random.randint(1, 3))
+                            time.sleep(random.uniform(0.3, 0.8))
                             obj = sess.get(filter_accessories_url,
                                            headers=headers, verify=False)
                             with open(filter_accessories_path, 'wb') as fh:
@@ -1053,7 +1053,7 @@ if __name__ == '__main__':
                                 with open(accessories_path, 'r', encoding="utf-8") as fh:
                                     accessory_json = json.load(fh)
                             else:
-                                time.sleep(random.randint(1, 3))
+                                time.sleep(random.uniform(0.3, 0.8))
                                 obj = sess.get(accessories_url,
                                             headers=headers, verify=False)
                                 with open(accessories_path, 'wb') as fh:
@@ -1108,7 +1108,7 @@ if __name__ == '__main__':
                             with open(complete_price_path, 'r', encoding="utf-8") as fh:
                                 complete_price_json = json.load(fh)
                         else:
-                            time.sleep(random.randint(1, 3))
+                            time.sleep(random.uniform(0.3, 0.8))
                             obj = sess.post(
                                 'https://prod.ucp.bmw.cloud/pricing/calculation/public-calculation/price-lists/pcaso,con/brands/bmwi/countries/gb',
                                 json=json_payload_data,
@@ -1136,6 +1136,11 @@ if __name__ == '__main__':
                         all_records.append(car_detail_model)
                         counter += 1
                         uid_counter += 1
+
+        # Stop processing further product blocks once we have enough records
+        if len(all_records) >= MAX_RECORDS:
+            print(f"[INFO] MAX_RECORDS ({MAX_RECORDS}) reached — stopping.")
+            break
 
     # Write combined single-file output
     bmw_json = f"{output_path}bmw.json"

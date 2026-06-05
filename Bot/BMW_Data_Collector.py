@@ -729,6 +729,16 @@ def extract_diesel_data(json_data):
 
     return result
 
+class _TimeoutAdapter(requests.adapters.HTTPAdapter):
+    """HTTPAdapter that enforces a hard timeout on every request."""
+    def __init__(self, timeout=15, **kw):
+        self._timeout = timeout
+        super().__init__(**kw)
+    def send(self, *args, **kwargs):
+        kwargs.setdefault("timeout", self._timeout)
+        return super().send(*args, **kwargs)
+
+
 if __name__ == '__main__':
     print("[INFO] BMW Data Collector starting...")
     prev_block = ""
@@ -740,6 +750,10 @@ if __name__ == '__main__':
     uid_counter = 1
     MAX_RECORDS = 5
     sess = requests.Session()
+    # Enforce 15-second timeout on every request — prevents indefinite hangs
+    _adapter = _TimeoutAdapter(timeout=15)
+    sess.mount("https://", _adapter)
+    sess.mount("http://",  _adapter)
     sess.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36'
     models_url = 'https://www.bmw.co.uk/en/all-models.html'
     all_models_path = f'{html_path}all_models.html'
@@ -759,6 +773,7 @@ if __name__ == '__main__':
     car_soup = soup.find("div", attrs={"cmp-allmodels--container "})
     counter = 0
     for product_block in soup.find_all('div', attrs={'class': 'allmodelscard container responsivegrid'}):
+      try:
         vehicle_info_url = None
         build_and_price_url = extract_configurator_url(product_block)
         technical_detail_url = None
@@ -1137,10 +1152,13 @@ if __name__ == '__main__':
                         counter += 1
                         uid_counter += 1
 
-        # Stop processing further product blocks once we have enough records
-        if len(all_records) >= MAX_RECORDS:
-            print(f"[INFO] MAX_RECORDS ({MAX_RECORDS}) reached — stopping.")
-            break
+      except Exception as _model_exc:
+          print(f"[WARN] Skipping model due to error: {_model_exc}")
+
+      # Stop processing further product blocks once we have enough records
+      if len(all_records) >= MAX_RECORDS:
+          print(f"[INFO] MAX_RECORDS ({MAX_RECORDS}) reached — stopping.")
+          break
 
     # Write combined single-file output
     bmw_json = f"{output_path}bmw.json"

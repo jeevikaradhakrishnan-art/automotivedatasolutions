@@ -210,11 +210,16 @@ def _build_hitl_items(bot_id: str, records: list[dict], job_id: str) -> list[dic
 
         if bot_id == "tesla-configurator":
             fields = _hitl_fields_tesla(record)
-            trim = record.get("trim", {})
-            trim_name = trim.get("name", str(trim)) if isinstance(trim, dict) else str(trim)
-            record_name = f"{record.get('Brand', 'Tesla')} {record.get('model', '')} — {trim_name}"
+            # For Tesla, always use the live configurator URL so the backend proxy
+            # fetches the real Tesla website for the HITL LHS preview.
+            live_url = record.get("configurator_url", "") or record.get("Configurator Page Link", "")
+            if live_url:
+                html_file = live_url  # frontend BotHtmlViewer will route http→ /api/proxy
+            model_name = record.get("model", "")
+            region     = record.get("region", record.get("Country", ""))
+            record_name = f"Tesla {model_name} — {region}"
             summary     = record_name
-            detail      = f"Verify trim specs, pricing and options for {record_name} against the downloaded Tesla configurator page."
+            detail      = f"Verify specs, pricing and options for {record_name} against the live Tesla configurator page."
         else:
             fields      = _hitl_fields_bmw(record)
             record_name = record.get("Name", uid)
@@ -754,22 +759,79 @@ _PROXY_UA_POOL = [
 
 
 def _fetch_with_playwright(url: str) -> str | None:
-    """Use a headless Chromium browser to fully render a JS-heavy page."""
+    """
+    Fully-stealthed non-headless Chromium fetch — same approach as the bot.
+    Non-headless + webdriver flag hidden gives the best chance of bypassing
+    CDN bot-detection (Cloudflare, Akamai) that Tesla/BMW use.
+    """
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
         return None
     try:
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True)
+            browser = pw.chromium.launch(
+                headless=False,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--window-size=1440,900",
+                    "--disable-dev-shm-usage",
+                ],
+            )
             ctx = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
                 viewport={"width": 1440, "height": 900},
                 locale="en-US",
+                bypass_csp=True,
+                ignore_https_errors=True,
             )
+            ctx.set_extra_http_headers({
+                "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Upgrade-Insecure-Requests": "1",
+            })
             page = ctx.new_page()
-            page.goto(url, wait_until="networkidle", timeout=30_000)
+            # Hide automation signals
+            page.add_init_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined})")
+            page.add_init_script("Object.defineProperty(navigator,'platform',{get:()=>'Win32'})")
+            page.add_init_script("Object.defineProperty(navigator,'plugins',{get:()=>[1,2,3,4,5]})")
+
+            # Warm up from the site's homepage so cookies are set
+            base = "/".join(url.split("/")[:3])   # e.g. https://www.tesla.com
+            try:
+                page.goto(base, wait_until="domcontentloaded", timeout=20_000,
+                          referer="https://www.google.com/")
+                page.wait_for_timeout(2000)
+            except Exception:
+                pass
+
+            page.goto(url, wait_until="domcontentloaded", timeout=40_000,
+                      referer=base + "/")
+            try:
+                page.wait_for_load_state("networkidle", timeout=15_000)
+            except Exception:
+                pass
+            page.wait_for_timeout(2500)
+
+            # Fix body visibility inline styles (Tesla hides body during loading)
+            page.evaluate("""() => {
+                if (document.body) {
+                    document.body.style.removeProperty('display');
+                    document.body.style.removeProperty('visibility');
+                    document.body.style.removeProperty('opacity');
+                    document.body.style.setProperty('display','block','important');
+                    document.body.style.setProperty('visibility','visible','important');
+                    document.body.style.setProperty('opacity','1','important');
+                }
+                document.documentElement.classList.remove('coin-reloaded','async-hide','tds-modal--is-open');
+                document.body.classList.remove('coin-reloaded','async-hide','tds-modal--is-open');
+            }""")
+            page.wait_for_timeout(500)
+
             html = page.content()
+            ctx.close()
             browser.close()
             return html if len(html) > 20_000 else None
     except Exception:

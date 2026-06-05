@@ -516,7 +516,8 @@ def _build_record(page: dict, specs: dict) -> dict:
         "Country":          page["country"],
         "Currency":         page["currency"],
         "configurator_url": page["url"],
-        "html_file":        page["html_file"],
+        # html_file = the LIVE Tesla URL so the backend proxy fetches the real page
+        "html_file":        page["url"],
         "Configurator Page Link": page["url"],
         # Base trim values (first trim)
         "base_price":       base.get("price", ""),

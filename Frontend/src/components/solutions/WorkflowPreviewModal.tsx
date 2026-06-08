@@ -13,6 +13,7 @@ import inventoryImg     from "@/assets/workflows/inventory-workflow.png";
 const WORKFLOW_IMAGES: Record<string, { src: string; alt: string }> = {
   "w-ev-1":   { src: evImg,            alt: "EV charging network workflow" },
   "w-mfg-1":  { src: inventoryImg,     alt: "Plant operations inventory workflow" },
+  "w-dlr-1":  { src: inventoryImg,     alt: "Dealer and inventory intelligence workflow" },
   "w-news-1": { src: multipleSources,   alt: "Multi-source predictive insights pipeline" },
   "w-mfg-2":  { src: automotiveRepair,  alt: "Plant operations PDF/HTML extraction pipeline" },
   "w-cfg-1":  { src: oemImg,            alt: "OEM configurator extraction pipeline" },

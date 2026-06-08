@@ -158,7 +158,7 @@ function TopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
         </div>
         <div className="leading-tight">
           <div className="font-mono text-[9px] text-muted-foreground tracking-widest">XDAS</div>
-          <div className="text-sm font-semibold tracking-tight">Mobility Intelligence</div>
+          <div className="text-sm font-semibold tracking-tight">Automotive Intelligence</div>
         </div>
       </Link>
 

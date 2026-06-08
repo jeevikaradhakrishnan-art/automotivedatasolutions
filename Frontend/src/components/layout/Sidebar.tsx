@@ -25,7 +25,7 @@ export function Sidebar() {
         </div>
         <div className="leading-tight">
           <div className="font-mono text-[10px] text-muted-foreground tracking-widest">XDAS</div>
-          <div className="text-sm font-semibold">Mobility Intelligence</div>
+          <div className="text-sm font-semibold">Automotive Intelligence</div>
         </div>
       </div>
 

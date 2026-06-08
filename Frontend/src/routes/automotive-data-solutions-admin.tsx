@@ -4,9 +4,12 @@ import * as XLSX from "xlsx";
 import {
   Activity, Search, Upload, Trash2, Power, PowerOff, Edit3, Save, X,
   FileText, History, Database, Tag as TagIcon, Download, Plus, ExternalLink, Eye, ShieldAlert,
+  GripVertical, Sparkles,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SOLUTIONS } from "@/data/solutions";
+import { CAPABILITIES } from "@/data/capabilities";
+import { usePlatform } from "@/store/platform";
 import { useSolutionOverrides, type SolutionOverride, type SolutionDatasetRow } from "@/hooks/useSolutionOverrides";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -32,6 +35,7 @@ async function logActivity(action: string, solution_id: string | null, details: 
 
 function AdminConsole() {
   const { overrides, loading } = useSolutionOverrides();
+  const [adminTab, setAdminTab] = useState<"solutions" | "usecases">("solutions");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled">("all");
   const [editing, setEditing] = useState<string | null>(null);
@@ -39,6 +43,11 @@ function AdminConsole() {
   const [activity, setActivity] = useState<ActivityRow[]>([]);
   const [previewDs, setPreviewDs] = useState<SolutionDatasetRow | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; body: string; onConfirm: () => void } | null>(null);
+
+  const usecaseOrder         = usePlatform((s) => s.usecaseOrder);
+  const disabledUsecases     = usePlatform((s) => s.disabledUsecases);
+  const setUsecaseOrder      = usePlatform((s) => s.setUsecaseOrder);
+  const toggleUsecaseEnabled = usePlatform((s) => s.toggleUsecaseEnabled);
 
   // Load datasets + activity, subscribe realtime
   useEffect(() => {
@@ -101,6 +110,14 @@ function AdminConsole() {
             <div className="font-mono text-[10px] tracking-widest text-muted-foreground">AUTOMOTIVE DATA SOLUTIONS</div>
             <h1 className="text-base font-semibold tracking-tight">Admin Console</h1>
           </div>
+          <select
+            value={adminTab}
+            onChange={(e) => setAdminTab(e.target.value as "solutions" | "usecases")}
+            className="ml-4 h-8 px-3 rounded-md border border-border bg-card text-xs font-mono text-foreground focus:outline-none focus:border-primary/50 cursor-pointer"
+          >
+            <option value="solutions">Solutions</option>
+            <option value="usecases">Use Cases</option>
+          </select>
           <div className="ml-auto flex items-center gap-2 text-[11px] font-mono text-muted-foreground">
             <ShieldAlert className="size-3.5 text-amber" />
             <span>UNLISTED · URL-ONLY ACCESS</span>
@@ -112,94 +129,109 @@ function AdminConsole() {
       </header>
 
       <main className="max-w-[1500px] mx-auto px-6 py-6 space-y-6">
-        {/* Toolbar */}
-        <div className="panel p-4 flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[240px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search solutions by title, code, description…" className="pl-9 h-9" />
-          </div>
-          <div className="flex items-center gap-1 p-0.5 rounded-md border border-border bg-card">
-            {(["all", "enabled", "disabled"] as const).map((f) => (
-              <button key={f} onClick={() => setStatusFilter(f)} className={`px-3 h-7 rounded text-xs font-mono ${statusFilter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-                {f.toUpperCase()}
-              </button>
-            ))}
-          </div>
-          <div className="text-[10px] font-mono text-muted-foreground tracking-widest">
-            {merged.filter((m) => m.enabled).length}/{merged.length} ENABLED
-          </div>
-        </div>
 
-        {/* Solutions list */}
-        <div className="space-y-3">
-          {loading && <div className="panel p-8 text-center text-sm text-muted-foreground">Loading…</div>}
-          {!loading && filtered.map((s) => {
-            const dsForSol = datasets.filter((d) => d.solution_id === s.id);
-            const isEditing = editing === s.id;
-            return (
-              <div key={s.id} className={`panel overflow-hidden transition ${!s.enabled ? "opacity-70" : ""}`}>
-                <div className="px-5 py-4 flex items-start gap-4 border-b border-border">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] tracking-widest text-muted-foreground">{s.code}</span>
-                      {!s.enabled && <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-danger/10 text-danger border border-danger/30">HIDDEN FROM PUBLIC</span>}
-                      {s.updatedAt && <span className="font-mono text-[10px] text-muted-foreground">· updated {new Date(s.updatedAt).toLocaleString()}</span>}
-                    </div>
-                    <h3 className="text-base font-semibold mt-0.5 truncate">{s.title}</h3>
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{s.description}</p>
-                    {s.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {s.tags.map((t) => <span key={t} className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border bg-surface-elevated">{t}</span>)}
+        {adminTab === "solutions" && <>
+          {/* Toolbar */}
+          <div className="panel p-4 flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search solutions by title, code, description…" className="pl-9 h-9" />
+            </div>
+            <div className="flex items-center gap-1 p-0.5 rounded-md border border-border bg-card">
+              {(["all", "enabled", "disabled"] as const).map((f) => (
+                <button key={f} onClick={() => setStatusFilter(f)} className={`px-3 h-7 rounded text-xs font-mono ${statusFilter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                  {f.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <div className="text-[10px] font-mono text-muted-foreground tracking-widest">
+              {merged.filter((m) => m.enabled).length}/{merged.length} ENABLED
+            </div>
+          </div>
+
+          {/* Solutions list */}
+          <div className="space-y-3">
+            {loading && <div className="panel p-8 text-center text-sm text-muted-foreground">Loading…</div>}
+            {!loading && filtered.map((s) => {
+              const dsForSol = datasets.filter((d) => d.solution_id === s.id);
+              const isEditing = editing === s.id;
+              return (
+                <div key={s.id} className={`panel overflow-hidden transition ${!s.enabled ? "opacity-70" : ""}`}>
+                  <div className="px-5 py-4 flex items-start gap-4 border-b border-border">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] tracking-widest text-muted-foreground">{s.code}</span>
+                        {!s.enabled && <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-danger/10 text-danger border border-danger/30">HIDDEN FROM PUBLIC</span>}
+                        {s.updatedAt && <span className="font-mono text-[10px] text-muted-foreground">· updated {new Date(s.updatedAt).toLocaleString()}</span>}
                       </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      {s.enabled ? <Power className="size-3.5 text-success" /> : <PowerOff className="size-3.5 text-muted-foreground" />}
-                      <Switch checked={s.enabled} onCheckedChange={() => toggleEnabled(s.id, s.enabled)} />
+                      <h3 className="text-base font-semibold mt-0.5 truncate">{s.title}</h3>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{s.description}</p>
+                      {s.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {s.tags.map((t) => <span key={t} className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border bg-surface-elevated">{t}</span>)}
+                        </div>
+                      )}
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => setEditing(isEditing ? null : s.id)}>
-                      {isEditing ? <><X className="size-3.5" /> Close</> : <><Edit3 className="size-3.5" /> Edit</>}
-                    </Button>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        {s.enabled ? <Power className="size-3.5 text-success" /> : <PowerOff className="size-3.5 text-muted-foreground" />}
+                        <Switch checked={s.enabled} onCheckedChange={() => toggleEnabled(s.id, s.enabled)} />
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => setEditing(isEditing ? null : s.id)}>
+                        {isEditing ? <><X className="size-3.5" /> Close</> : <><Edit3 className="size-3.5" /> Edit</>}
+                      </Button>
+                    </div>
                   </div>
-                </div>
 
-                {isEditing && (
-                  <EditPanel
+                  {isEditing && (
+                    <EditPanel
+                      solutionId={s.id}
+                      initial={{
+                        title: s.title, description: s.description, metrics: s.metrics, tags: s.tags,
+                        downloadAssets: s.downloadAssets, sampleDatasets: s.sampleDatasets,
+                      }}
+                      onClose={() => setEditing(null)}
+                    />
+                  )}
+
+                  {/* Datasets row */}
+                  <DatasetsRow
                     solutionId={s.id}
-                    initial={{
-                      title: s.title, description: s.description, metrics: s.metrics, tags: s.tags,
-                      downloadAssets: s.downloadAssets, sampleDatasets: s.sampleDatasets,
-                    }}
-                    onClose={() => setEditing(null)}
+                    datasets={dsForSol}
+                    onPreview={setPreviewDs}
+                    onAskDelete={(d) =>
+                      setConfirm({
+                        title: "Delete dataset?",
+                        body: `Remove ${d.file_name}? This cannot be undone.`,
+                        onConfirm: async () => {
+                          await supabase.storage.from(BUCKET).remove([d.storage_path]);
+                          await supabase.from("solution_datasets").delete().eq("id", d.id);
+                          await logActivity("dataset.deleted", d.solution_id, { file_name: d.file_name });
+                          setConfirm(null);
+                        },
+                      })
+                    }
                   />
-                )}
+                </div>
+              );
+            })}
+            {!loading && filtered.length === 0 && (
+              <div className="panel p-10 text-center text-sm text-muted-foreground">No solutions match the current filters.</div>
+            )}
+          </div>
+        </>}
 
-                {/* Datasets row */}
-                <DatasetsRow
-                  solutionId={s.id}
-                  datasets={dsForSol}
-                  onPreview={setPreviewDs}
-                  onAskDelete={(d) =>
-                    setConfirm({
-                      title: "Delete dataset?",
-                      body: `Remove ${d.file_name}? This cannot be undone.`,
-                      onConfirm: async () => {
-                        await supabase.storage.from(BUCKET).remove([d.storage_path]);
-                        await supabase.from("solution_datasets").delete().eq("id", d.id);
-                        await logActivity("dataset.deleted", d.solution_id, { file_name: d.file_name });
-                        setConfirm(null);
-                      },
-                    })
-                  }
-                />
-              </div>
-            );
-          })}
-          {!loading && filtered.length === 0 && (
-            <div className="panel p-10 text-center text-sm text-muted-foreground">No solutions match the current filters.</div>
-          )}
-        </div>
+        {adminTab === "usecases" && (
+          <UseCasesSection
+            usecaseOrder={usecaseOrder}
+            disabledUsecases={disabledUsecases}
+            setUsecaseOrder={setUsecaseOrder}
+            onToggle={async (id, wasEnabled) => {
+              toggleUsecaseEnabled(id);
+              await logActivity(wasEnabled ? "usecase.disabled" : "usecase.enabled", null, { id });
+            }}
+          />
+        )}
 
         {/* Activity */}
         <div className="panel">
@@ -258,6 +290,144 @@ function AdminConsole() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/* ---------- Use Cases Section ---------- */
+function UseCasesSection({
+  usecaseOrder,
+  disabledUsecases,
+  setUsecaseOrder,
+  onToggle,
+}: {
+  usecaseOrder: string[];
+  disabledUsecases: string[];
+  setUsecaseOrder: (ids: string[]) => void;
+  onToggle: (id: string, wasEnabled: boolean) => void;
+}) {
+  const [ucQuery, setUcQuery] = useState("");
+  const [ucFilter, setUcFilter] = useState<"all" | "enabled" | "disabled">("all");
+  const dragIdx = useRef<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  const ordered = useMemo(
+    () => usecaseOrder.map((id) => CAPABILITIES.find((c) => c.id === id)).filter(Boolean) as typeof CAPABILITIES,
+    [usecaseOrder],
+  );
+
+  const filtered = ordered.filter((c) => {
+    const enabled = !disabledUsecases.includes(c.id);
+    const q = ucQuery.toLowerCase();
+    const matchQ = !q || c.title.toLowerCase().includes(q) || c.customerProfile.toLowerCase().includes(q) || (c.industryTag ?? "").toLowerCase().includes(q);
+    const matchF = ucFilter === "all" || (ucFilter === "enabled" ? enabled : !enabled);
+    return matchQ && matchF;
+  });
+
+  function handleDragStart(idx: number) { dragIdx.current = idx; }
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>, idx: number) { e.preventDefault(); setDragOverIdx(idx); }
+  function handleDragEnd() { dragIdx.current = null; setDragOverIdx(null); }
+  function handleDrop(e: React.DragEvent<HTMLDivElement>, dropIdx: number) {
+    e.preventDefault();
+    const from = dragIdx.current;
+    if (from === null || from === dropIdx) { handleDragEnd(); return; }
+    // Map filtered-list indices back to positions in the full ordered array
+    const fromId = filtered[from].id;
+    const toId   = filtered[dropIdx].id;
+    const next   = ordered.map((c) => c.id);
+    const oFrom  = next.indexOf(fromId);
+    const oTo    = next.indexOf(toId);
+    const [moved] = next.splice(oFrom, 1);
+    next.splice(oTo, 0, moved);
+    setUsecaseOrder(next);
+    handleDragEnd();
+  }
+
+  const enabledCount = ordered.filter((c) => !disabledUsecases.includes(c.id)).length;
+
+  return (
+    <div className="space-y-3">
+      {/* Toolbar */}
+      <div className="panel p-4 flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <Input
+            value={ucQuery}
+            onChange={(e) => setUcQuery(e.target.value)}
+            placeholder="Search use cases by title, profile, industry…"
+            className="pl-9 h-9"
+          />
+        </div>
+        <div className="flex items-center gap-1 p-0.5 rounded-md border border-border bg-card">
+          {(["all", "enabled", "disabled"] as const).map((f) => (
+            <button key={f} onClick={() => setUcFilter(f)} className={`px-3 h-7 rounded text-xs font-mono ${ucFilter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+              {f.toUpperCase()}
+            </button>
+          ))}
+        </div>
+        <div className="text-[10px] font-mono text-muted-foreground tracking-widest">
+          {enabledCount}/{ordered.length} ENABLED
+        </div>
+        <div className="text-[10px] font-mono text-muted-foreground">
+          · Drag rows to reorder · Changes persist in browser storage
+        </div>
+      </div>
+
+      {/* Use case rows */}
+      <div className="space-y-2">
+        {filtered.length === 0 && (
+          <div className="panel p-10 text-center text-sm text-muted-foreground">No use cases match the current filters.</div>
+        )}
+        {filtered.map((c, idx) => {
+          const enabled = !disabledUsecases.includes(c.id);
+          const Icon = c.icon;
+          const isDragTarget = dragOverIdx === idx && dragIdx.current !== null && dragIdx.current !== idx;
+          return (
+            <div
+              key={c.id}
+              draggable
+              onDragStart={() => handleDragStart(idx)}
+              onDragOver={(e) => handleDragOver(e, idx)}
+              onDrop={(e) => handleDrop(e, idx)}
+              onDragEnd={handleDragEnd}
+              className={`panel flex items-center gap-4 px-5 py-4 transition select-none cursor-grab active:cursor-grabbing ${!enabled ? "opacity-60" : ""} ${isDragTarget ? "border-cyan/50 bg-cyan/5" : ""}`}
+            >
+              <GripVertical className="size-4 text-muted-foreground/40 shrink-0" />
+
+              <div
+                className="size-9 rounded grid place-items-center shrink-0"
+                style={{ background: `color-mix(in oklch, ${c.accent} 15%, transparent)`, border: `1px solid color-mix(in oklch, ${c.accent} 30%, transparent)` }}
+              >
+                <Icon className="size-4" style={{ color: c.accent }} />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-medium truncate">{c.title}</h3>
+                  {!enabled && (
+                    <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-danger/10 text-danger border border-danger/30 shrink-0">HIDDEN FROM PUBLIC</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[10px] font-mono text-muted-foreground truncate">{c.customerProfile}</span>
+                  {c.industryTag && <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border bg-surface-elevated shrink-0">{c.industryTag}</span>}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{c.oneLiner}</p>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0">
+                <span className={`font-mono text-[10px] px-2 py-0.5 rounded border ${enabled ? "text-success border-success/30 bg-success/10" : "text-muted-foreground border-border bg-input/40"}`}>
+                  {enabled ? "ENABLED" : "DISABLED"}
+                </span>
+                <div className="flex items-center gap-2">
+                  {enabled ? <Power className="size-3.5 text-success" /> : <PowerOff className="size-3.5 text-muted-foreground" />}
+                  <Switch checked={enabled} onCheckedChange={() => onToggle(c.id, enabled)} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

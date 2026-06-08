@@ -1,10 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { Sparkles, ArrowRight } from "lucide-react";
-import { CAPABILITIES } from "@/data/capabilities";
+import { CAPABILITIES, type CapabilityCase } from "@/data/capabilities";
+import { usePlatform } from "@/store/platform";
 
 export const Route = createFileRoute("/_app/capabilities/")({ component: CapabilitiesLanding });
 
 function CapabilitiesLanding() {
+  const usecaseOrder = usePlatform((s) => s.usecaseOrder);
+  const disabledUsecases = usePlatform((s) => s.disabledUsecases);
+
+  const capabilities = useMemo((): CapabilityCase[] => {
+    return usecaseOrder
+      .map((id) => CAPABILITIES.find((c) => c.id === id))
+      .filter((c): c is CapabilityCase => c != null && !disabledUsecases.includes(c.id));
+  }, [usecaseOrder, disabledUsecases]);
+
   return (
     <div className="p-5 space-y-5">
       <div>
@@ -18,7 +29,7 @@ function CapabilitiesLanding() {
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {CAPABILITIES.map((c) => {
+        {capabilities.map((c) => {
           const Icon = c.icon;
           return (
             <Link

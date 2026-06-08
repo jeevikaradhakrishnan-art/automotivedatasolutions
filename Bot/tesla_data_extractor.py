@@ -223,7 +223,7 @@ KNOWN_SPECS: dict = {
     },
 }
 
-# ── HTML generation helper ─────────────────────────────────────────────────────
+# ── Cleanup CSS injected into downloaded pages ─────────────────────────────────
 DISMISS_CSS = """<style id="_tesla_cleanup">
   html,body{overflow:auto!important;height:auto!important;display:block!important;
             visibility:visible!important;opacity:1!important}
@@ -232,129 +232,6 @@ DISMISS_CSS = """<style id="_tesla_cleanup">
   [id*=banner],[class*=banner],[id*=overlay],[class*=overlay],
   [id*=scrim],[class*=scrim]{display:none!important}
 </style>"""
-
-
-def _generate_tesla_html(page: dict, specs: dict) -> str:
-    """Generate a comprehensive Tesla-styled configurator page from known spec data."""
-    model    = page["model"]
-    region   = page["region"]
-    currency = page["currency"]
-    url      = page["url"]
-    trims    = specs.get("trims", [])
-    colors   = specs.get("colors", [])
-    wheels   = specs.get("wheels", [])
-    interior = specs.get("interior", [])
-    base     = trims[0] if trims else {}
-
-    def option_rows(items: list, key: str = "name") -> str:
-        out = ""
-        for o in items:
-            sel = ' class="opt sel"' if o.get("type") == "Std" else ' class="opt"'
-            out += (
-                f'<div{sel}>'
-                f'<span class="opt-name">{o[key]}</span>'
-                f'<span class="opt-price">{o["price"]}</span>'
-                f'</div>'
-            )
-        return out
-
-    trim_cards = ""
-    for t in trims:
-        trim_cards += f"""
-<div class="trim-card">
-  <div class="trim-hdr">
-    <span class="trim-name">{t["name"]}</span>
-    <span class="trim-price">{t["price"]}</span>
-  </div>
-  <div class="specs-grid">
-    <div class="spec"><div class="sv">{t.get("range", t.get("range_km","—"))}</div><div class="sl">{specs.get("range_label","Range")}</div></div>
-    <div class="spec"><div class="sv">{t.get("accel","—")}</div><div class="sl">Acceleration</div></div>
-    <div class="spec"><div class="sv">{t.get("top_speed","—")}</div><div class="sl">Top Speed</div></div>
-    <div class="spec"><div class="sv">{t.get("horsepower", t.get("towing","—"))}</div><div class="sl">{"Peak Power" if "horsepower" in t else "Towing"}</div></div>
-    <div class="spec"><div class="sv">{t.get("drivetrain","—")}</div><div class="sl">Drivetrain</div></div>
-    <div class="spec"><div class="sv">{specs.get("seating","—")}</div><div class="sl">Seating</div></div>
-  </div>
-</div>"""
-
-    extra_specs = ""
-    for k in ["cargo", "ground_clearance", "body_material", "vault_length", "glass", "charge_time"]:
-        if k in specs:
-            label = k.replace("_", " ").title()
-            extra_specs += f'<div class="extra-row"><span class="ek">{label}</span><span class="ev">{specs[k]}</span></div>'
-
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<base href="https://www.tesla.com/">
-<title>Tesla {model} — {region} Configurator</title>
-{DISMISS_CSS}
-<style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;background:#171a20;color:#e8e8e8;font-size:14px;line-height:1.5}}
-.nav{{background:#000;padding:14px 40px;display:flex;align-items:center;gap:16px;border-bottom:1px solid #111}}
-.nav .logo{{font-size:22px;font-weight:700;letter-spacing:4px;color:#fff}}
-.nav .mn{{font-size:13px;color:#aaa}}
-.nav .src{{margin-left:auto;font-size:10px;font-family:monospace;color:#555;word-break:break-all}}
-.ph{{padding:32px 40px 20px;border-bottom:1px solid #222}}
-.ph h1{{font-size:30px;font-weight:300;letter-spacing:-.5px}}
-.ph .sub{{font-size:13px;color:#888;margin-top:6px}}
-.ph .region-tag{{display:inline-block;margin-top:10px;padding:3px 10px;border:1px solid #3e6ae1;color:#3e6ae1;font-size:11px;font-family:monospace;border-radius:3px}}
-.trim-card{{margin:24px 40px;border:1px solid #2a2a2a;border-radius:6px;overflow:hidden}}
-.trim-hdr{{background:#1a1a2e;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #2a2a2a}}
-.trim-name{{font-size:18px;font-weight:500}}
-.trim-price{{font-size:22px;font-weight:600;color:#3e6ae1}}
-.specs-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#222}}
-.spec{{background:#1b1b1b;padding:18px;text-align:center}}
-.sv{{font-size:18px;font-weight:500;color:#fff}}
-.sl{{font-size:10px;color:#666;margin-top:4px;text-transform:uppercase;letter-spacing:1px}}
-.section{{margin:24px 40px;border:1px solid #2a2a2a;border-radius:6px;overflow:hidden}}
-.sh{{background:#111;padding:12px 24px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:2px;color:#888;border-bottom:1px solid #2a2a2a}}
-.opts{{padding:16px 24px;display:grid;gap:8px}}
-.opt{{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border:1px solid #2a2a2a;border-radius:4px;background:#111}}
-.opt.sel{{border-color:#3e6ae1;background:rgba(62,106,225,.1)}}
-.opt-name{{color:#ccc;font-size:13px}}.opt-price{{color:#888;font-size:12px;font-family:monospace}}
-.extra-section{{margin:24px 40px;border:1px solid #2a2a2a;border-radius:6px;overflow:hidden}}
-.extra-row{{display:flex;justify-content:space-between;padding:10px 24px;border-top:1px solid #1a1a1a}}
-.ek{{color:#888;font-size:12px}}.ev{{color:#ccc;font-size:12px;font-family:monospace}}
-.ap-row{{margin:24px 40px;padding:14px 24px;border:1px solid #2a2a2a;border-radius:6px;font-size:12px;color:#aaa;font-family:monospace;background:#111}}
-.ft{{padding:20px 40px;border-top:1px solid #1a1a1a;font-size:10px;color:#444;font-family:monospace;margin-top:16px}}
-.ft a{{color:#3e6ae1;text-decoration:none}}
-</style>
-</head>
-<body>
-<div class="nav">
-  <div class="logo">TESLA</div>
-  <div class="mn">Tesla {model} · {region} Configurator</div>
-  <div class="src">{url}</div>
-</div>
-<div class="ph">
-  <h1>Tesla {model}</h1>
-  <div class="sub">{region} · {len(trims)} trim variant{"s" if len(trims)!=1 else ""} · Starting at {trims[0]["price"] if trims else "—"}</div>
-  <span class="region-tag">{region.upper()} · {currency}</span>
-</div>
-{trim_cards}
-<div class="section">
-  <div class="sh">Exterior Color</div>
-  <div class="opts">{option_rows(colors)}</div>
-</div>
-<div class="section">
-  <div class="sh">Wheels</div>
-  <div class="opts">{option_rows(wheels)}</div>
-</div>
-<div class="section">
-  <div class="sh">Interior</div>
-  <div class="opts">{option_rows(interior)}</div>
-</div>
-{f'<div class="extra-section"><div class="sh">Additional Specs</div>{extra_specs}</div>' if extra_specs else ""}
-<div class="ap-row">⚡ {specs.get("autopilot","")}</div>
-<div class="ft">
-  Source: <a href="{url}">{url}</a> ·
-  Country: {page["country"]} · Currency: {currency} ·
-  Extracted: {datetime.now().strftime("%Y-%m-%d %H:%M UTC")}
-</div>
-</body>
-</html>"""
 
 
 # ── Download helpers ───────────────────────────────────────────────────────────
@@ -399,12 +276,17 @@ def _try_requests(url: str, model: str) -> str | None:
     return None
 
 
-def _try_playwright(url: str, model: str) -> str | None:
+def _try_playwright(url: str, model: str, screenshot_path: Path | None = None) -> str | None:
+    """
+    Attempts a Playwright download of url. Returns real HTML when recognised, else None.
+    Regardless of outcome, saves a full-page screenshot to screenshot_path if provided
+    and the page loaded far enough for Playwright to render it.
+    """
     try:
         from playwright.sync_api import sync_playwright
         with sync_playwright() as pw:
             browser = pw.chromium.launch(
-                headless=False,
+                headless=True,
                 args=["--disable-blink-features=AutomationControlled",
                       "--no-sandbox", "--disable-setuid-sandbox",
                       "--window-size=1440,900"],
@@ -451,13 +333,22 @@ def _try_playwright(url: str, model: str) -> str | None:
             }""")
             page.wait_for_timeout(1000)
 
+            # Capture screenshot before closing — records whatever Tesla shows
+            if screenshot_path:
+                try:
+                    screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+                    page.screenshot(path=str(screenshot_path), full_page=True)
+                    print(f"  [SCREENSHOT] {screenshot_path.name} ({screenshot_path.stat().st_size:,} bytes)")
+                except Exception as se:
+                    print(f"  [WARN] screenshot failed: {se}")
+
             html = page.content()
             ctx.close()
             browser.close()
 
             if _is_real_tesla_page(html, model):
                 print(f"  [OK] playwright → {len(html):,} bytes")
-                base_tag = f'<base href="https://www.tesla.com/">'
+                base_tag = '<base href="https://www.tesla.com/">'
                 html = html.replace("<head>", f"<head>{base_tag}", 1) if "<head>" in html else base_tag + html
                 return _inject_cleanup(html)
             print(f"  [SKIP] playwright → {len(html):,} bytes — not recognised")
@@ -516,8 +407,9 @@ def _build_record(page: dict, specs: dict) -> dict:
         "Country":          page["country"],
         "Currency":         page["currency"],
         "configurator_url": page["url"],
-        # html_file = the LIVE Tesla URL so the backend proxy fetches the real page
-        "html_file":        page["url"],
+        # Set by the main loop after confirming what was actually saved
+        "html_file":        "",
+        "screenshot_file":  "",
         "Configurator Page Link": page["url"],
         # Base trim values (first trim)
         "base_price":       base.get("price", ""),
@@ -546,17 +438,20 @@ def _build_record(page: dict, specs: dict) -> dict:
 
 
 if __name__ == "__main__":
+    (HTML_DIR / "screenshots").mkdir(exist_ok=True)
+
     print("[INFO] Tesla Configurator Bot — 3 live pages")
     print(f"[INFO] Targets: {[p['url'] for p in TARGET_PAGES]}\n")
 
     all_records = []
 
     for page in TARGET_PAGES:
-        model  = page["model"]
-        region = page["region"]
-        url    = page["url"]
-        hfile  = HTML_DIR / page["html_file"]
-        specs  = KNOWN_SPECS.get(model, {}).get(region, {})
+        model   = page["model"]
+        region  = page["region"]
+        url     = page["url"]
+        hfile   = HTML_DIR / page["html_file"]
+        ss_file = HTML_DIR / "screenshots" / page["html_file"].replace(".html", ".png")
+        specs   = KNOWN_SPECS.get(model, {}).get(region, {})
 
         print(f"[INFO] ── {model} ({region}) ──")
         print(f"[INFO]   URL       : {url}")
@@ -565,7 +460,7 @@ if __name__ == "__main__":
         # ── Try to get the live page ──────────────────────────────────────
         live_html: str | None = None
 
-        # Reuse cached file if it looks real (avoids re-downloading on every bot run)
+        # Reuse cached real HTML (avoids re-downloading on every bot run)
         if hfile.exists():
             cached = hfile.read_text(encoding="utf-8")
             if _is_real_tesla_page(cached, model):
@@ -578,25 +473,23 @@ if __name__ == "__main__":
 
         if not live_html:
             print(f"  Trying Playwright …")
-            live_html = _try_playwright(url, model)
-
-        if live_html:
-            hfile.write_text(live_html, encoding="utf-8")
-            print(f"  [SAVED] {hfile.name}  ({len(live_html):,} bytes)")
-        else:
-            # Fallback: generate rich Tesla-styled HTML with all spec data
-            print(f"  [FALLBACK] generating spec page for {model} ({region})")
-            gen_html = _generate_tesla_html(page, specs)
-            hfile.write_text(gen_html, encoding="utf-8")
-            print(f"  [SAVED] {hfile.name}  ({len(gen_html):,} bytes, generated)")
+            live_html = _try_playwright(url, model, screenshot_path=ss_file)
 
         # ── Build record ──────────────────────────────────────────────────
         record = _build_record(page, specs)
 
-        # Supplement with any values we can extract from the downloaded HTML
-        if live_html and live_html != hfile.read_text(encoding="utf-8"):
+        if live_html:
+            hfile.write_text(live_html, encoding="utf-8")
+            print(f"  [SAVED] {hfile.name}  ({len(live_html):,} bytes)")
+            record["html_file"] = page["html_file"]
+            # Supplement with any values extractable from the live DOM
             extra = _extract_attrs_from_html(live_html, page, specs)
             record.update({k: v for k, v in extra.items() if v and k not in record})
+        elif ss_file.exists():
+            record["screenshot_file"] = ss_file.name
+            print(f"  [PREVIEW] screenshot saved → {ss_file.name}")
+        else:
+            print(f"  [WARN] No preview available for {model} ({region})")
 
         indiv = OUTPUT_DIR / f"{model.replace(' ', '_')}_{region}.json"
         indiv.write_text(json.dumps(record, ensure_ascii=False, indent=4), encoding="utf-8")

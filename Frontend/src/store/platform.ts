@@ -50,6 +50,7 @@ export interface HitlItem {
   jobId?: string;
   uid?: string;
   htmlFile?: string;
+  screenshotFile?: string;
   liveUrl?: string;
   workflow?: string;
   recordName?: string;
@@ -63,7 +64,7 @@ export interface HitlItem {
   status: HitlStatus;
   createdAt: string;
   reviewer?: string;
-  previewKind?: "html" | "pdf";
+  previewKind?: "html" | "pdf" | "screenshot";
 }
 
 export interface Feedback {
@@ -92,6 +93,11 @@ interface PlatformState {
   hitl: HitlItem[];
   feedback: Feedback[];
   integrationLinks: IntegrationLink[];
+  // Manage page ordering + visibility
+  solutionOrder: SolutionId[];
+  disabledSolutions: SolutionId[];
+  usecaseOrder: string[];
+  disabledUsecases: string[];
   toggleSubscription: (id: SolutionId) => void;
   addDataset: (d: Dataset) => void;
   removeDataset: (id: string) => void;
@@ -103,6 +109,10 @@ interface PlatformState {
   addIntegrationLink: (l: IntegrationLink) => void;
   removeIntegrationLink: (id: string) => void;
   completeJobReview: (jobId: string) => void;
+  setSolutionOrder: (order: SolutionId[]) => void;
+  toggleSolutionEnabled: (id: SolutionId) => void;
+  setUsecaseOrder: (order: string[]) => void;
+  toggleUsecaseEnabled: (id: string) => void;
 }
 
 const VEHICLE_FIELDS = (oem: string, model: string, trim: string, msrp: string): HitlField[] => [
@@ -141,50 +151,452 @@ const NEWS_FIELDS: HitlField[] = [
 ];
 // ---- Seeded jobs (a couple already reviewed, one pending review with HITL batch) ----
 
-const TS_3H_AGO = Date.now() - 1000 * 60 * 60 * 3;
-const TS_25M_AGO = Date.now() - 1000 * 60 * 25;
-const TS_6H_AGO = Date.now() - 1000 * 60 * 60 * 6;
-const TS_18M_AGO = Date.now() - 1000 * 60 * 18;
+const H   = 1000 * 60 * 60;
+const M   = 1000 * 60;
+const NOW = () => Date.now();
+
+// Helpers to keep job definitions concise
+const ago = (ms: number) => new Date(NOW() - ms).toISOString();
+const fin = (startMs: number, runtimeMs: number) => new Date(NOW() - startMs + runtimeMs).toISOString();
+const okSteps = (names: string[]): JobStep[] =>
+  names.map((name, i) => ({ name, status: "ok" as const, ts: `T+${String(Math.floor(i * 8)).padStart(2, "0")}:${String((i * 8) % 60).padStart(2, "0")}` }));
 
 const seedJobs = (): Job[] => [
-  { id: "j-evgo-001", solutionId: "ev-charging", source: "EVgo", status: "success", workflow: "EV Stations · Daily Pull", mode: "delta", deltaSummary: { added: 146, updated: 22, removed: 0 }, startedAt: new Date(TS_3H_AGO).toISOString(), finishedAt: new Date(TS_3H_AGO + 62_000).toISOString(), runtimeMs: 62_000, rowsProduced: 168, reviewTotal: 6, reviewApproved: 6, reviewRejected: 0, format: "CSV", steps: [
-    { name: "Aggregate · source crawl",  status: "ok", ts: "T+00:02", note: "1,842 raw records fetched" },
-    { name: "Transform · normalize",     status: "ok", ts: "T+00:14", note: "Mapped to Mobius FLO schema" },
-    { name: "Enrich · geocode",          status: "ok", ts: "T+00:31", note: "OSM Nominatim · 100% hit" },
-    { name: "Delta · diff vs last run",  status: "ok", ts: "T+00:42", note: "146 new · 22 updated · 0 removed" },
-    { name: "QA · confidence scoring",   status: "ok", ts: "T+00:51", note: "Confidence avg 94%" },
-    { name: "Deliver · persist + notify",status: "ok", ts: "T+01:02" },
-  ] },
-  { id: "j-veh-101", solutionId: "vehicle-spec", source: "Ford · ford.com", status: "review", workflow: "OEM Catalog · Weekly Crawl", mode: "delta", startedAt: new Date(TS_18M_AGO).toISOString(), finishedAt: new Date(TS_18M_AGO + 91_000).toISOString(), runtimeMs: 91_000, rowsProduced: 118, reviewTotal: 4, reviewApproved: 0, reviewRejected: 0, format: "CSV", steps: [
-    { name: "Aggregate · configurator crawl", status: "ok", ts: "T+00:04" },
-    { name: "Transform · trim normalize",     status: "ok", ts: "T+00:22" },
-    { name: "Enrich · MSRP + incentives",     status: "ok", ts: "T+00:48" },
-    { name: "QA · awaiting human review",     status: "running", ts: "T+01:31" },
-  ] },
-  { id: "j-veh-102", solutionId: "vehicle-spec", source: "BMW · bmwusa.com", status: "review", workflow: "OEM Catalog · Weekly Crawl", mode: "delta", startedAt: new Date(TS_18M_AGO + 1000).toISOString(), finishedAt: new Date(TS_18M_AGO + 88_000).toISOString(), runtimeMs: 87_000, rowsProduced: 64, reviewTotal: 3, reviewApproved: 0, reviewRejected: 0, format: "CSV", steps: [
-    { name: "Aggregate · configurator crawl", status: "ok", ts: "T+00:03" },
-    { name: "Transform · trim normalize",     status: "ok", ts: "T+00:18" },
-    { name: "Enrich · MSRP + incentives",     status: "ok", ts: "T+00:41" },
-    { name: "QA · awaiting human review",     status: "running", ts: "T+01:27" },
-  ] },
-  { id: "j-news-014", solutionId: "news", source: "Reuters Autos", status: "review", workflow: "News · Continuous", mode: "delta", startedAt: new Date(TS_25M_AGO).toISOString(), finishedAt: new Date(TS_25M_AGO + 18_000).toISOString(), runtimeMs: 18_000, rowsProduced: 38, reviewTotal: 3, reviewApproved: 0, reviewRejected: 0, format: "JSON", steps: [
-    { name: "Aggregate · RSS pull",      status: "ok", ts: "T+00:01" },
-    { name: "Transform · language",      status: "ok", ts: "T+00:03" },
-    { name: "Enrich · cluster",          status: "ok", ts: "T+00:08", note: "12 clusters" },
-    { name: "Enrich · insight gen",      status: "ok", ts: "T+00:14" },
-    { name: "QA · awaiting human review",status: "running", ts: "T+00:18" },
-  ] },
-  { id: "j-plant-007", solutionId: "plants", source: "Supplier list (8,014)", status: "review", workflow: "Plants · Full Refresh", mode: "full", startedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(), finishedAt: new Date(Date.now() - 1000 * 60 * 11).toISOString(), runtimeMs: 34 * 60_000, rowsProduced: 412, reviewTotal: 5, reviewApproved: 0, reviewRejected: 0, format: "XLSX", steps: [
-    { name: "Aggregate · load input",    status: "ok", ts: "T+00:00", note: "8,014 companies" },
-    { name: "Aggregate · site crawl",    status: "ok", ts: "T+12:14" },
-    { name: "Enrich · geocode",          status: "ok", ts: "T+21:48" },
-    { name: "Transform · admin map",     status: "ok", ts: "T+29:10" },
-    { name: "QA · awaiting human review",status: "running", ts: "T+34:02" },
-  ] },
-  { id: "j-dlr-002", solutionId: "dealer-inventory", source: "OEM rooftop registry", status: "failed", workflow: "Dealer · Weekly Snapshot", mode: "delta", startedAt: new Date(TS_6H_AGO).toISOString(), finishedAt: new Date(TS_6H_AGO + 11_000).toISOString(), runtimeMs: 11_000, format: "CSV", steps: [
-    { name: "Aggregate · pull rooftops", status: "ok",   ts: "T+00:02" },
-    { name: "Aggregate · inventory feed",status: "fail", ts: "T+00:11", note: "Auth 401 from VIN feed — credentials expired" },
-  ] },
+  // ══ OEM Configurator — 4 success · 2 review · 1 failed ═══════
+  { id: "j-oem-001", solutionId: "oem-config", source: "BMW + Tesla", status: "success",
+    workflow: "BMW + Tesla Configurator Walk", mode: "delta",
+    deltaSummary: { added: 84, updated: 31, removed: 0 },
+    startedAt: ago(2*24*H), finishedAt: fin(2*24*H, 74_000), runtimeMs: 74_000, rowsProduced: 115,
+    reviewTotal: 4, reviewApproved: 4, reviewRejected: 0, format: "CSV",
+    steps: [
+      { name: "Aggregate · configurator walk", status: "ok", ts: "T+00:04", note: "BMW + Tesla sessions captured" },
+      { name: "Transform · option normalize",  status: "ok", ts: "T+00:22", note: "Mapped to customer template" },
+      { name: "Enrich · pricing rollup + FX",  status: "ok", ts: "T+00:41" },
+      { name: "Delta · new + repriced configs",status: "ok", ts: "T+00:56", note: "84 new · 31 repriced" },
+      { name: "QA · confidence scoring",       status: "ok", ts: "T+01:08", note: "Confidence avg 97%" },
+      { name: "Deliver · persist + notify",    status: "ok", ts: "T+01:14" },
+    ],
+  },
+  { id: "j-oem-002", solutionId: "oem-config", source: "BMW + Tesla", status: "success",
+    workflow: "BMW + Tesla Configurator Walk", mode: "delta",
+    deltaSummary: { added: 61, updated: 18, removed: 2 },
+    startedAt: ago(24*H + 2*H), finishedAt: fin(24*H + 2*H, 71_000), runtimeMs: 71_000, rowsProduced: 79,
+    reviewTotal: 3, reviewApproved: 3, reviewRejected: 0, format: "CSV",
+    steps: okSteps(["Aggregate · configurator walk", "Transform · option normalize", "Enrich · pricing rollup", "Delta", "QA · scoring", "Deliver"]),
+  },
+  { id: "j-oem-003", solutionId: "oem-config", source: "BMW + Tesla", status: "success",
+    workflow: "Pricing Delta · Hourly Sweep", mode: "delta",
+    deltaSummary: { added: 0, updated: 7, removed: 0 },
+    startedAt: ago(4*H), finishedAt: fin(4*H, 9_000), runtimeMs: 9_000, rowsProduced: 7,
+    reviewTotal: 1, reviewApproved: 1, reviewRejected: 0, format: "CSV",
+    steps: okSteps(["Aggregate · price sweep", "Transform · normalize", "Delta · MSRP moves", "QA · auto-approve", "Deliver"]),
+  },
+  { id: "j-oem-004", solutionId: "oem-config", source: "BMW + Tesla", status: "success",
+    workflow: "Pricing Delta · Hourly Sweep", mode: "delta",
+    deltaSummary: { added: 0, updated: 3, removed: 0 },
+    startedAt: ago(2*H), finishedAt: fin(2*H, 8_000), runtimeMs: 8_000, rowsProduced: 3,
+    reviewTotal: 0, reviewApproved: 0, reviewRejected: 0, format: "CSV",
+    steps: okSteps(["Aggregate · price sweep", "Transform · normalize", "Delta · MSRP moves", "Deliver"]),
+  },
+  { id: "j-oem-005", solutionId: "oem-config", source: "BMW + Tesla", status: "review",
+    workflow: "Pricing Delta · Hourly Sweep", mode: "delta",
+    startedAt: ago(40*M), finishedAt: fin(40*M, 9_000), runtimeMs: 9_000, rowsProduced: 12,
+    reviewTotal: 2, reviewApproved: 0, reviewRejected: 0, format: "CSV",
+    steps: [
+      { name: "Aggregate · price endpoint sweep",    status: "ok",      ts: "T+00:01" },
+      { name: "Transform · normalize option codes",  status: "ok",      ts: "T+00:04" },
+      { name: "Delta · MSRP moves > 2%",             status: "ok",      ts: "T+00:07", note: "2 alerts flagged" },
+      { name: "QA · awaiting human review",          status: "running", ts: "T+00:09" },
+    ],
+  },
+  { id: "j-oem-006", solutionId: "oem-config", source: "BMW Configurator", status: "review",
+    workflow: "BMW + Tesla Configurator Walk", mode: "delta",
+    startedAt: ago(5*H), finishedAt: fin(5*H, 74_000), runtimeMs: 74_000, rowsProduced: 44,
+    reviewTotal: 2, reviewApproved: 0, reviewRejected: 0, format: "CSV",
+    steps: [
+      { name: "Aggregate · BMW session walk",  status: "ok",      ts: "T+00:06" },
+      { name: "Transform · option normalize",  status: "ok",      ts: "T+00:28" },
+      { name: "Enrich · pricing rollup",       status: "ok",      ts: "T+00:48" },
+      { name: "QA · awaiting human review",    status: "running", ts: "T+01:14" },
+    ],
+  },
+  { id: "j-oem-007", solutionId: "oem-config", source: "Tesla Configurator", status: "failed",
+    workflow: "New Model Year · Launch Watch", mode: "delta",
+    startedAt: ago(8*H), finishedAt: fin(8*H, 7_000), runtimeMs: 7_000, format: "CSV",
+    steps: [
+      { name: "Aggregate · catalog index crawl", status: "ok",   ts: "T+00:02" },
+      { name: "Transform · MY/trim hierarchy",   status: "fail", ts: "T+00:07", note: "Auth cookie expired — session rejected by configurator" },
+    ],
+  },
+
+  // ══ EV Charging — 5 success · 2 review · 0 failed ════════════
+  { id: "j-ev-001", solutionId: "ev-charging", source: "EVgo", status: "success",
+    workflow: "EV Stations · Daily Pull", mode: "delta",
+    deltaSummary: { added: 146, updated: 22, removed: 0 },
+    startedAt: ago(3*H), finishedAt: fin(3*H, 62_000), runtimeMs: 62_000, rowsProduced: 168,
+    reviewTotal: 6, reviewApproved: 6, reviewRejected: 0, format: "CSV",
+    steps: [
+      { name: "Aggregate · source crawl",   status: "ok", ts: "T+00:02", note: "1,842 raw records" },
+      { name: "Transform · normalize",      status: "ok", ts: "T+00:14", note: "Mobius FLO schema" },
+      { name: "Enrich · geocode",           status: "ok", ts: "T+00:31", note: "100% hit rate" },
+      { name: "Delta · diff vs last run",   status: "ok", ts: "T+00:42", note: "146 new · 22 updated" },
+      { name: "QA · confidence scoring",    status: "ok", ts: "T+00:51", note: "Confidence avg 94%" },
+      { name: "Deliver · persist + notify", status: "ok", ts: "T+01:02" },
+    ],
+  },
+  { id: "j-ev-002", solutionId: "ev-charging", source: "ChargePoint + EVgo", status: "success",
+    workflow: "EV Stations · Daily Pull", mode: "delta",
+    deltaSummary: { added: 98, updated: 14, removed: 1 },
+    startedAt: ago(24*H + H), finishedAt: fin(24*H + H, 59_000), runtimeMs: 59_000, rowsProduced: 113,
+    reviewTotal: 4, reviewApproved: 4, reviewRejected: 0, format: "CSV",
+    steps: okSteps(["Aggregate · source crawl", "Transform · normalize", "Enrich · geocode", "Delta", "QA · scoring", "Deliver"]),
+  },
+  { id: "j-ev-003", solutionId: "ev-charging", source: "ChargePoint + Electrify America", status: "success",
+    workflow: "Utilization Heatmap · Hourly", mode: "delta",
+    deltaSummary: { added: 0, updated: 204, removed: 0 },
+    startedAt: ago(2*H), finishedAt: fin(2*H, 14_000), runtimeMs: 14_000, rowsProduced: 204,
+    reviewTotal: 2, reviewApproved: 2, reviewRejected: 0, format: "JSON",
+    steps: okSteps(["Aggregate · telemetry pings", "Transform · bucket station×hr", "Enrich · corridor overlay", "QA · auto-approve", "Deliver"]),
+  },
+  { id: "j-ev-004", solutionId: "ev-charging", source: "Multi-network (6)", status: "success",
+    workflow: "EV Stations · Daily Pull", mode: "delta",
+    deltaSummary: { added: 211, updated: 37, removed: 3 },
+    startedAt: ago(48*H + 3*H), finishedAt: fin(48*H + 3*H, 65_000), runtimeMs: 65_000, rowsProduced: 251,
+    reviewTotal: 7, reviewApproved: 7, reviewRejected: 0, format: "CSV",
+    steps: okSteps(["Aggregate · source crawl", "Transform · normalize", "Enrich · geocode", "Delta", "QA · scoring", "Deliver"]),
+  },
+  { id: "j-ev-005", solutionId: "ev-charging", source: "Network site index", status: "success",
+    workflow: "New Site Detection · Daily", mode: "delta",
+    deltaSummary: { added: 18, updated: 0, removed: 0 },
+    startedAt: ago(24*H + 5*H), finishedAt: fin(24*H + 5*H, 21_000), runtimeMs: 21_000, rowsProduced: 18,
+    reviewTotal: 2, reviewApproved: 2, reviewRejected: 0, format: "CSV",
+    steps: okSteps(["Aggregate · site index", "Transform · new site dedupe", "Delta · net-new sites", "QA · confidence ≥ 80", "Deliver"]),
+  },
+  { id: "j-ev-006", solutionId: "ev-charging", source: "ChargePoint + EVgo", status: "review",
+    workflow: "Utilization Heatmap · Hourly", mode: "delta",
+    startedAt: ago(25*M), finishedAt: fin(25*M, 14_000), runtimeMs: 14_000, rowsProduced: 94,
+    reviewTotal: 3, reviewApproved: 0, reviewRejected: 0, format: "JSON",
+    steps: [
+      { name: "Aggregate · telemetry pings",      status: "ok",      ts: "T+00:02" },
+      { name: "Transform · bucket by station×hr", status: "ok",      ts: "T+00:08" },
+      { name: "Enrich · corridor overlay",        status: "ok",      ts: "T+00:11" },
+      { name: "QA · awaiting human review",       status: "running", ts: "T+00:14" },
+    ],
+  },
+  { id: "j-ev-007", solutionId: "ev-charging", source: "EVgo + Electrify America", status: "review",
+    workflow: "EV Stations · Daily Pull", mode: "delta",
+    startedAt: ago(4*H), finishedAt: fin(4*H, 58_000), runtimeMs: 58_000, rowsProduced: 131,
+    reviewTotal: 4, reviewApproved: 0, reviewRejected: 0, format: "CSV",
+    steps: [
+      { name: "Aggregate · source crawl",   status: "ok",      ts: "T+00:03", note: "1,614 raw records" },
+      { name: "Transform · normalize",      status: "ok",      ts: "T+00:16" },
+      { name: "Enrich · geocode",           status: "ok",      ts: "T+00:34" },
+      { name: "Delta · diff vs last run",   status: "ok",      ts: "T+00:47" },
+      { name: "QA · awaiting human review", status: "running", ts: "T+00:58" },
+    ],
+  },
+
+  // ══ Vehicle Spec — 4 success · 3 review · 1 failed ═══════════
+  { id: "j-veh-001", solutionId: "vehicle-spec", source: "Tesla + Toyota", status: "success",
+    workflow: "OEM Catalog · Weekly Crawl", mode: "delta",
+    deltaSummary: { added: 22, updated: 9, removed: 1 },
+    startedAt: ago(24*H + H), finishedAt: fin(24*H + H, 88_000), runtimeMs: 88_000, rowsProduced: 32,
+    reviewTotal: 5, reviewApproved: 5, reviewRejected: 0, format: "CSV",
+    steps: [
+      { name: "Aggregate · multi-source crawl", status: "ok", ts: "T+00:06", note: "Tesla + Toyota in parallel" },
+      { name: "Transform · trim normalize",     status: "ok", ts: "T+00:28" },
+      { name: "Enrich · MSRP + incentives",     status: "ok", ts: "T+00:54" },
+      { name: "Delta · new + changed trims",    status: "ok", ts: "T+01:11", note: "22 new · 9 updated · 1 removed" },
+      { name: "QA · confidence scoring",        status: "ok", ts: "T+01:24", note: "Confidence avg 96%" },
+      { name: "Deliver · persist + notify",     status: "ok", ts: "T+01:28" },
+    ],
+  },
+  { id: "j-veh-002", solutionId: "vehicle-spec", source: "Hyundai + Stellantis", status: "success",
+    workflow: "OEM Catalog · Weekly Crawl", mode: "delta",
+    deltaSummary: { added: 14, updated: 6, removed: 0 },
+    startedAt: ago(7*24*H), finishedAt: fin(7*24*H, 91_000), runtimeMs: 91_000, rowsProduced: 20,
+    reviewTotal: 3, reviewApproved: 3, reviewRejected: 0, format: "CSV",
+    steps: okSteps(["Aggregate · crawl", "Transform · trim normalize", "Enrich · MSRP", "Delta", "QA · scoring", "Deliver"]),
+  },
+  { id: "j-veh-003", solutionId: "vehicle-spec", source: "Tesla · all models", status: "success",
+    workflow: "New Model Detection · Daily", mode: "delta",
+    deltaSummary: { added: 3, updated: 0, removed: 0 },
+    startedAt: ago(48*H + 2*H), finishedAt: fin(48*H + 2*H, 18_000), runtimeMs: 18_000, rowsProduced: 3,
+    reviewTotal: 1, reviewApproved: 1, reviewRejected: 0, format: "CSV",
+    steps: okSteps(["Aggregate · page diff", "Transform · trim hierarchy", "Delta · new trims", "QA · auto-approve", "Deliver"]),
+  },
+  { id: "j-veh-004", solutionId: "vehicle-spec", source: "Toyota + Volkswagen", status: "success",
+    workflow: "New Model Detection · Daily", mode: "delta",
+    deltaSummary: { added: 1, updated: 2, removed: 0 },
+    startedAt: ago(72*H), finishedAt: fin(72*H, 16_000), runtimeMs: 16_000, rowsProduced: 3,
+    reviewTotal: 1, reviewApproved: 1, reviewRejected: 0, format: "CSV",
+    steps: okSteps(["Aggregate · page diff", "Transform · trim hierarchy", "Delta", "Deliver"]),
+  },
+  // j-veh-101 and j-veh-102 are HITL-linked — keep IDs and status
+  { id: "j-veh-101", solutionId: "vehicle-spec", source: "Ford · ford.com", status: "review",
+    workflow: "OEM Catalog · Weekly Crawl", mode: "delta",
+    startedAt: ago(18*M), finishedAt: fin(18*M, 91_000), runtimeMs: 91_000, rowsProduced: 118,
+    reviewTotal: 4, reviewApproved: 0, reviewRejected: 0, format: "CSV",
+    steps: [
+      { name: "Aggregate · configurator crawl", status: "ok",      ts: "T+00:04" },
+      { name: "Transform · trim normalize",     status: "ok",      ts: "T+00:22" },
+      { name: "Enrich · MSRP + incentives",     status: "ok",      ts: "T+00:48" },
+      { name: "QA · awaiting human review",     status: "running", ts: "T+01:31" },
+    ],
+  },
+  { id: "j-veh-102", solutionId: "vehicle-spec", source: "BMW · bmwusa.com", status: "review",
+    workflow: "OEM Catalog · Weekly Crawl", mode: "delta",
+    startedAt: ago(18*M + 1000), finishedAt: fin(18*M + 1000, 88_000), runtimeMs: 87_000, rowsProduced: 64,
+    reviewTotal: 3, reviewApproved: 0, reviewRejected: 0, format: "CSV",
+    steps: [
+      { name: "Aggregate · configurator crawl", status: "ok",      ts: "T+00:03" },
+      { name: "Transform · trim normalize",     status: "ok",      ts: "T+00:18" },
+      { name: "Enrich · MSRP + incentives",     status: "ok",      ts: "T+00:41" },
+      { name: "QA · awaiting human review",     status: "running", ts: "T+01:27" },
+    ],
+  },
+  { id: "j-veh-103", solutionId: "vehicle-spec", source: "BYD · eu configurator", status: "review",
+    workflow: "New Model Detection · Daily", mode: "delta",
+    startedAt: ago(6*H), finishedAt: fin(6*H, 16_000), runtimeMs: 16_000, rowsProduced: 8,
+    reviewTotal: 2, reviewApproved: 0, reviewRejected: 0, format: "CSV",
+    steps: [
+      { name: "Aggregate · page diff",         status: "ok",      ts: "T+00:03" },
+      { name: "Transform · trim hierarchy",    status: "ok",      ts: "T+00:09" },
+      { name: "Delta · new trims",             status: "ok",      ts: "T+00:13", note: "8 new BYD trims detected" },
+      { name: "QA · awaiting human review",    status: "running", ts: "T+00:16" },
+    ],
+  },
+  { id: "j-veh-104", solutionId: "vehicle-spec", source: "Hyundai + BYD", status: "failed",
+    workflow: "New Model Detection · Daily", mode: "delta",
+    startedAt: ago(12*H), finishedAt: fin(12*H, 13_000), runtimeMs: 13_000, format: "CSV",
+    steps: [
+      { name: "Aggregate · configurator page diff", status: "ok",   ts: "T+00:03" },
+      { name: "Transform · extract trim hierarchy", status: "fail", ts: "T+00:13", note: "BYD site returned Cloudflare challenge — bot detection triggered" },
+    ],
+  },
+
+  // ══ News — 5 success · 3 review · 0 failed ═══════════════════
+  { id: "j-news-001", solutionId: "news", source: "USPTO / EPO / SEC EDGAR", status: "success",
+    workflow: "Patents & Filings · Daily", mode: "delta",
+    deltaSummary: { added: 47, updated: 3, removed: 0 },
+    startedAt: ago(8*H), finishedAt: fin(8*H, 31_000), runtimeMs: 31_000, rowsProduced: 50,
+    reviewTotal: 2, reviewApproved: 2, reviewRejected: 0, format: "JSON",
+    steps: [
+      { name: "Aggregate · USPTO/EPO/SEC EDGAR", status: "ok", ts: "T+00:05" },
+      { name: "Transform · filing type classify",status: "ok", ts: "T+00:13" },
+      { name: "Enrich · theme + OEM tagging",    status: "ok", ts: "T+00:22", note: "ADAS · Solid-state · V2G" },
+      { name: "Delta · new filings only",        status: "ok", ts: "T+00:28", note: "47 new filings" },
+      { name: "QA · confidence scoring",         status: "ok", ts: "T+00:30", note: "Confidence avg 91%" },
+      { name: "Deliver · persist + notify",      status: "ok", ts: "T+00:31" },
+    ],
+  },
+  { id: "j-news-002", solutionId: "news", source: "Wire sources (6)", status: "success",
+    workflow: "Exec Brief · Weekly Digest", mode: "full",
+    startedAt: ago(72*H + 2*H), finishedAt: fin(72*H + 2*H, 44_000), runtimeMs: 44_000, rowsProduced: 1,
+    reviewTotal: 1, reviewApproved: 1, reviewRejected: 0, format: "JSON",
+    steps: okSteps(["Aggregate · week's clusters", "Transform · rank by impact", "Enrich · auto-write narrative", "QA · scoring", "Deliver"]),
+  },
+  { id: "j-news-003", solutionId: "news", source: "Reuters + Bloomberg Autos", status: "success",
+    workflow: "News · Continuous", mode: "delta",
+    deltaSummary: { added: 31, updated: 0, removed: 0 },
+    startedAt: ago(2*H), finishedAt: fin(2*H, 18_000), runtimeMs: 18_000, rowsProduced: 31,
+    reviewTotal: 2, reviewApproved: 2, reviewRejected: 0, format: "JSON",
+    steps: okSteps(["Aggregate · RSS pull", "Transform · language", "Enrich · cluster", "Enrich · insight gen", "QA · scoring", "Deliver"]),
+  },
+  { id: "j-news-004", solutionId: "news", source: "USPTO / EPO / SEC EDGAR", status: "success",
+    workflow: "Patents & Filings · Daily", mode: "delta",
+    deltaSummary: { added: 39, updated: 1, removed: 0 },
+    startedAt: ago(32*H), finishedAt: fin(32*H, 29_000), runtimeMs: 29_000, rowsProduced: 40,
+    reviewTotal: 2, reviewApproved: 2, reviewRejected: 0, format: "JSON",
+    steps: okSteps(["Aggregate · filings", "Transform · classify", "Enrich · theme tagging", "Delta", "QA · scoring", "Deliver"]),
+  },
+  { id: "j-news-005", solutionId: "news", source: "Electrek + Nikkei Autos", status: "success",
+    workflow: "News · Continuous", mode: "delta",
+    deltaSummary: { added: 24, updated: 0, removed: 0 },
+    startedAt: ago(4*H), finishedAt: fin(4*H, 17_000), runtimeMs: 17_000, rowsProduced: 24,
+    reviewTotal: 1, reviewApproved: 1, reviewRejected: 0, format: "JSON",
+    steps: okSteps(["Aggregate · RSS pull", "Transform · language", "Enrich · cluster + insight", "QA · scoring", "Deliver"]),
+  },
+  // j-news-014 is HITL-linked — keep ID and status
+  { id: "j-news-014", solutionId: "news", source: "Reuters Autos", status: "review",
+    workflow: "News · Continuous", mode: "delta",
+    startedAt: ago(25*M), finishedAt: fin(25*M, 18_000), runtimeMs: 18_000, rowsProduced: 38,
+    reviewTotal: 3, reviewApproved: 0, reviewRejected: 0, format: "JSON",
+    steps: [
+      { name: "Aggregate · RSS pull",       status: "ok",      ts: "T+00:01" },
+      { name: "Transform · language",       status: "ok",      ts: "T+00:03" },
+      { name: "Enrich · cluster",           status: "ok",      ts: "T+00:08", note: "12 clusters" },
+      { name: "Enrich · insight gen",       status: "ok",      ts: "T+00:14" },
+      { name: "QA · awaiting human review", status: "running", ts: "T+00:18" },
+    ],
+  },
+  { id: "j-news-006", solutionId: "news", source: "Bloomberg Autos", status: "review",
+    workflow: "News · Continuous", mode: "delta",
+    startedAt: ago(H), finishedAt: fin(H, 19_000), runtimeMs: 19_000, rowsProduced: 27,
+    reviewTotal: 2, reviewApproved: 0, reviewRejected: 0, format: "JSON",
+    steps: [
+      { name: "Aggregate · RSS pull",       status: "ok",      ts: "T+00:01" },
+      { name: "Transform · language",       status: "ok",      ts: "T+00:04" },
+      { name: "Enrich · cluster + insight", status: "ok",      ts: "T+00:14" },
+      { name: "QA · awaiting human review", status: "running", ts: "T+00:19" },
+    ],
+  },
+  { id: "j-news-007", solutionId: "news", source: "Automotive News wire", status: "review",
+    workflow: "Patents & Filings · Daily", mode: "delta",
+    startedAt: ago(3*H), finishedAt: fin(3*H, 28_000), runtimeMs: 28_000, rowsProduced: 19,
+    reviewTotal: 2, reviewApproved: 0, reviewRejected: 0, format: "JSON",
+    steps: [
+      { name: "Aggregate · USPTO/EPO filings", status: "ok",      ts: "T+00:04" },
+      { name: "Transform · classify",          status: "ok",      ts: "T+00:11" },
+      { name: "Enrich · theme tagging",        status: "ok",      ts: "T+00:22" },
+      { name: "QA · awaiting human review",    status: "running", ts: "T+00:28" },
+    ],
+  },
+
+  // ══ Plants — 4 success · 3 review · 1 failed ═════════════════
+  { id: "j-plant-001", solutionId: "plants", source: "Top-200 watchlist", status: "success",
+    workflow: "Capacity Watch · Monthly", mode: "delta",
+    deltaSummary: { added: 11, updated: 34, removed: 0 },
+    startedAt: ago(48*H + H), finishedAt: fin(48*H + H, 28*M), runtimeMs: 28*M, rowsProduced: 45,
+    reviewTotal: 3, reviewApproved: 3, reviewRejected: 0, format: "XLSX",
+    steps: [
+      { name: "Aggregate · top-200 watchlist",  status: "ok", ts: "T+00:00", note: "200 plants targeted" },
+      { name: "Transform · capacity/headcount", status: "ok", ts: "T+08:21" },
+      { name: "Delta · capacity moves only",    status: "ok", ts: "T+21:44", note: "34 capacity updates" },
+      { name: "QA · confidence scoring",        status: "ok", ts: "T+26:10", note: "Confidence avg 88%" },
+      { name: "Deliver · persist + notify",     status: "ok", ts: "T+28:00" },
+    ],
+  },
+  { id: "j-plant-002", solutionId: "plants", source: "Supplier list (8,014)", status: "success",
+    workflow: "Plants · Full Refresh", mode: "full",
+    startedAt: ago(15*24*H), finishedAt: fin(15*24*H, 34*M), runtimeMs: 34*M, rowsProduced: 398,
+    reviewTotal: 5, reviewApproved: 5, reviewRejected: 0, format: "XLSX",
+    steps: okSteps(["Aggregate · load input", "Aggregate · site crawl", "Enrich · geocode", "Transform · admin map", "QA · scoring", "Deliver"]),
+  },
+  { id: "j-plant-003", solutionId: "plants", source: "Top-200 watchlist", status: "success",
+    workflow: "Capacity Watch · Monthly", mode: "delta",
+    deltaSummary: { added: 6, updated: 28, removed: 1 },
+    startedAt: ago(32*24*H), finishedAt: fin(32*24*H, 26*M), runtimeMs: 26*M, rowsProduced: 35,
+    reviewTotal: 2, reviewApproved: 2, reviewRejected: 0, format: "XLSX",
+    steps: okSteps(["Aggregate · watchlist crawl", "Transform · capacity extract", "Delta", "QA · scoring", "Deliver"]),
+  },
+  { id: "j-plant-004", solutionId: "plants", source: "Change-flagged suppliers", status: "success",
+    workflow: "Plants · Quarterly Delta", mode: "delta",
+    deltaSummary: { added: 22, updated: 41, removed: 7 },
+    startedAt: ago(90*24*H), finishedAt: fin(90*24*H, 22*M), runtimeMs: 22*M, rowsProduced: 70,
+    reviewTotal: 4, reviewApproved: 4, reviewRejected: 0, format: "XLSX",
+    steps: okSteps(["Aggregate · targeted recrawl", "Transform · plant extract", "Enrich · geocode", "Delta", "QA · scoring", "Deliver"]),
+  },
+  { id: "j-plant-005", solutionId: "plants", source: "Top-200 watchlist", status: "review",
+    workflow: "Capacity Watch · Monthly", mode: "delta",
+    startedAt: ago(3*H), finishedAt: fin(3*H, 27*M), runtimeMs: 27*M, rowsProduced: 38,
+    reviewTotal: 3, reviewApproved: 0, reviewRejected: 0, format: "XLSX",
+    steps: [
+      { name: "Aggregate · watchlist crawl",    status: "ok",      ts: "T+00:00" },
+      { name: "Transform · capacity/headcount", status: "ok",      ts: "T+07:44" },
+      { name: "Delta · capacity moves only",    status: "ok",      ts: "T+20:11" },
+      { name: "QA · awaiting human review",     status: "running", ts: "T+27:00" },
+    ],
+  },
+  // j-plant-007 is HITL-linked — keep ID and status
+  { id: "j-plant-007", solutionId: "plants", source: "Supplier list (8,014)", status: "review",
+    workflow: "Plants · Full Refresh", mode: "full",
+    startedAt: ago(45*M), finishedAt: ago(11*M), runtimeMs: 34*M, rowsProduced: 412,
+    reviewTotal: 5, reviewApproved: 0, reviewRejected: 0, format: "XLSX",
+    steps: [
+      { name: "Aggregate · load input",     status: "ok",      ts: "T+00:00", note: "8,014 companies" },
+      { name: "Aggregate · site crawl",     status: "ok",      ts: "T+12:14" },
+      { name: "Enrich · geocode",           status: "ok",      ts: "T+21:48" },
+      { name: "Transform · admin map",      status: "ok",      ts: "T+29:10" },
+      { name: "QA · awaiting human review", status: "running", ts: "T+34:02" },
+    ],
+  },
+  { id: "j-plant-009", solutionId: "plants", source: "Supplier list (8,014)", status: "review",
+    workflow: "Plants · Full Refresh", mode: "full",
+    startedAt: ago(72*H + H), finishedAt: fin(72*H + H, 33*M), runtimeMs: 33*M, rowsProduced: 402,
+    reviewTotal: 4, reviewApproved: 0, reviewRejected: 0, format: "XLSX",
+    steps: [
+      { name: "Aggregate · load input",    status: "ok",      ts: "T+00:00", note: "8,014 companies" },
+      { name: "Aggregate · site crawl",    status: "ok",      ts: "T+11:58" },
+      { name: "Enrich · geocode",          status: "ok",      ts: "T+21:02" },
+      { name: "Transform · admin map",     status: "ok",      ts: "T+28:44" },
+      { name: "QA · awaiting human review",status: "running", ts: "T+33:00" },
+    ],
+  },
+  { id: "j-plant-008", solutionId: "plants", source: "Change-flagged suppliers", status: "failed",
+    workflow: "Plants · Quarterly Delta", mode: "delta",
+    startedAt: ago(5*H), finishedAt: fin(5*H, 18_000), runtimeMs: 18_000, format: "XLSX",
+    steps: [
+      { name: "Aggregate · targeted recrawl", status: "ok",   ts: "T+00:06", note: "142 flagged suppliers" },
+      { name: "Transform · plant extract",    status: "fail", ts: "T+00:18", note: "CAPTCHA block on 38 supplier sites — geocoding aborted" },
+    ],
+  },
+
+  // ══ Dealer Inventory — 5 success · 2 review · 0 failed ═══════
+  { id: "j-dlr-001", solutionId: "dealer-inventory", source: "Dealer sites + GBP + DMV", status: "success",
+    workflow: "Independent Dealer Verify · 4-hour", mode: "delta",
+    deltaSummary: { added: 204, updated: 88, removed: 12 },
+    startedAt: ago(3*H), finishedAt: fin(3*H, 44_000), runtimeMs: 44_000, rowsProduced: 304,
+    reviewTotal: 6, reviewApproved: 6, reviewRejected: 0, format: "CSV",
+    steps: [
+      { name: "Aggregate · dealer site + GBP",    status: "ok", ts: "T+00:05", note: "CA, TX, FL, NY" },
+      { name: "Transform · fuzzy match name/addr", status: "ok", ts: "T+00:19" },
+      { name: "Enrich · confidence score",        status: "ok", ts: "T+00:34", note: "Avg confidence 87%" },
+      { name: "QA · confidence scoring",          status: "ok", ts: "T+00:41", note: "All above 80% threshold" },
+      { name: "Deliver · persist + notify",       status: "ok", ts: "T+00:44" },
+    ],
+  },
+  { id: "j-dlr-002", solutionId: "dealer-inventory", source: "OEM rooftop registry", status: "success",
+    workflow: "Dealer · Weekly Snapshot", mode: "delta",
+    deltaSummary: { added: 312, updated: 144, removed: 18 },
+    startedAt: ago(7*24*H), finishedAt: fin(7*24*H, 48_000), runtimeMs: 48_000, rowsProduced: 474,
+    reviewTotal: 5, reviewApproved: 5, reviewRejected: 0, format: "CSV",
+    steps: okSteps(["Aggregate · rooftops + VIN feed", "Transform · join VIN→rooftop", "Enrich · sales velocity", "Enrich · AI insight", "Delta", "QA · scoring", "Deliver"]),
+  },
+  { id: "j-dlr-003", solutionId: "dealer-inventory", source: "Dealer inventory feeds", status: "success",
+    workflow: "Pricing Aggressiveness · Daily", mode: "delta",
+    deltaSummary: { added: 0, updated: 88, removed: 0 },
+    startedAt: ago(5*H), finishedAt: fin(5*H, 21_000), runtimeMs: 21_000, rowsProduced: 88,
+    reviewTotal: 3, reviewApproved: 3, reviewRejected: 0, format: "CSV",
+    steps: okSteps(["Aggregate · inventory feeds", "Transform · price vs benchmark", "Enrich · aggressiveness index", "Delta · movers only", "QA · scoring", "Deliver"]),
+  },
+  { id: "j-dlr-004", solutionId: "dealer-inventory", source: "Dealer sites + GBP + DMV", status: "success",
+    workflow: "Independent Dealer Verify · 4-hour", mode: "delta",
+    deltaSummary: { added: 187, updated: 71, removed: 9 },
+    startedAt: ago(24*H + H), finishedAt: fin(24*H + H, 42_000), runtimeMs: 42_000, rowsProduced: 267,
+    reviewTotal: 5, reviewApproved: 5, reviewRejected: 0, format: "CSV",
+    steps: okSteps(["Aggregate · dealer site + GBP", "Transform · fuzzy match", "Enrich · confidence score", "QA · scoring", "Deliver"]),
+  },
+  { id: "j-dlr-005", solutionId: "dealer-inventory", source: "OEM rooftop registry", status: "success",
+    workflow: "Dealer · Weekly Snapshot", mode: "delta",
+    deltaSummary: { added: 288, updated: 129, removed: 11 },
+    startedAt: ago(14*24*H), finishedAt: fin(14*24*H, 51_000), runtimeMs: 51_000, rowsProduced: 428,
+    reviewTotal: 5, reviewApproved: 5, reviewRejected: 0, format: "CSV",
+    steps: okSteps(["Aggregate · rooftops + VIN feed", "Transform · join VIN→rooftop", "Enrich · sales velocity", "Delta", "QA · scoring", "Deliver"]),
+  },
+  { id: "j-dlr-006", solutionId: "dealer-inventory", source: "OEM rooftop registry", status: "review",
+    workflow: "Dealer · Weekly Snapshot", mode: "delta",
+    startedAt: ago(40*M), finishedAt: fin(40*M, 38_000), runtimeMs: 38_000, rowsProduced: 891,
+    reviewTotal: 4, reviewApproved: 0, reviewRejected: 0, format: "CSV",
+    steps: [
+      { name: "Aggregate · rooftops + VIN feed",   status: "ok",      ts: "T+00:04" },
+      { name: "Transform · join VIN → rooftop",    status: "ok",      ts: "T+00:16" },
+      { name: "Enrich · sales velocity benchmark", status: "ok",      ts: "T+00:28" },
+      { name: "Enrich · AI insight per dealer",    status: "ok",      ts: "T+00:35" },
+      { name: "QA · awaiting human review",        status: "running", ts: "T+00:38" },
+    ],
+  },
+  { id: "j-dlr-007", solutionId: "dealer-inventory", source: "Dealer inventory feeds", status: "review",
+    workflow: "Pricing Aggressiveness · Daily", mode: "delta",
+    startedAt: ago(2*H), finishedAt: fin(2*H, 22_000), runtimeMs: 22_000, rowsProduced: 74,
+    reviewTotal: 3, reviewApproved: 0, reviewRejected: 0, format: "CSV",
+    steps: [
+      { name: "Aggregate · inventory feeds",       status: "ok",      ts: "T+00:03" },
+      { name: "Transform · price vs benchmark",    status: "ok",      ts: "T+00:11" },
+      { name: "Enrich · aggressiveness index",     status: "ok",      ts: "T+00:18" },
+      { name: "QA · awaiting human review",        status: "running", ts: "T+00:22" },
+    ],
+  },
 ];
 
 const seedHitl = (): HitlItem[] => {
@@ -203,7 +615,7 @@ const seedHitl = (): HitlItem[] => {
     detail: `New trim discovered on Ford configurator. Verify MSRP and powertrain mapping against customer template.`,
     field: "trim/msrp", proposed: m.trim, current: "—",
     fields: VEHICLE_FIELDS("Ford", m.model, m.trim, m.msrp),
-    confidence: 78 - i * 3, status: "pending", createdAt: new Date(TS_18M_AGO + i * 1000).toISOString(), previewKind: i % 2 === 0 ? "pdf" : "html",
+    confidence: 78 - i * 3, status: "pending", createdAt: new Date(NOW() - 18*M + i * 1000).toISOString(), previewKind: i % 2 === 0 ? "pdf" : "html",
   }));
   // Vehicle BMW batch (3 records)
   const bmwModels = [
@@ -218,7 +630,7 @@ const seedHitl = (): HitlItem[] => {
     detail: `Confidence below threshold on battery_kwh field — verify before shipping to customer template.`,
     field: "battery_kwh", proposed: "82 kWh", current: "—",
     fields: VEHICLE_FIELDS("BMW", m.model, m.trim, m.msrp),
-    confidence: 74 - i * 4, status: "pending", createdAt: new Date(TS_18M_AGO + 5000 + i * 1000).toISOString(), previewKind: i === 1 ? "pdf" : "html",
+    confidence: 74 - i * 4, status: "pending", createdAt: new Date(NOW() - 18*M + 5000 + i * 1000).toISOString(), previewKind: i === 1 ? "pdf" : "html",
   }));
   // News batch (3 articles)
   ["BYD secures lithium supply deal in Atacama", "Toyota patent splits V2G / V2X classification", "GM Cruise restarts limited autonomy pilot"].forEach((h, i) => items.push({
@@ -226,7 +638,7 @@ const seedHitl = (): HitlItem[] => {
     recordName: h, summary: h, detail: "Verify clustering, sentiment and impact classification before shipping insight.",
     field: "cluster", proposed: "EV Supply Chain", current: "Lithium",
     fields: NEWS_FIELDS,
-    confidence: 81 - i * 5, status: "pending", createdAt: new Date(TS_25M_AGO + i * 1000).toISOString(), previewKind: "html",
+    confidence: 81 - i * 5, status: "pending", createdAt: new Date(NOW() - 25*M + i * 1000).toISOString(), previewKind: "html",
   }));
   // Plants batch (5 records)
   ["ZF Friedrichshafen Plant 1", "ZF Saarbrücken", "ZF Schweinfurt", "ZF Lebanon TN", "ZF Pune"].forEach((n, i) => items.push({
@@ -247,6 +659,10 @@ export const usePlatform = create<PlatformState>()(
       jobs: seedJobs(),
       hitl: seedHitl(),
       feedback: [],
+      solutionOrder: ["oem-config", "ev-charging", "news", "plants", "dealer-inventory", "vehicle-spec"],
+      disabledSolutions: [],
+      usecaseOrder: ["fleet-polygon", "dealer-verification", "auto-fitment", "incentives-rebates", "rental-pricing", "bike-trends"],
+      disabledUsecases: [],
       integrationLinks: [
         { id: "il-1", integrationId: "snowflake", solutionId: "ev-charging", workflowId: "w-ev-1", target: "MOBILITY.EV_STATIONS", createdAt: new Date().toISOString() },
         { id: "il-2", integrationId: "s3",        solutionId: "news",        workflowId: "w-news-1", target: "s3://xdas-news/daily/", createdAt: new Date().toISOString() },
@@ -277,6 +693,20 @@ export const usePlatform = create<PlatformState>()(
       addFeedback: (f) => set((s) => ({ feedback: [f, ...s.feedback] })),
       addIntegrationLink: (l) => set((s) => ({ integrationLinks: [l, ...s.integrationLinks] })),
       removeIntegrationLink: (id) => set((s) => ({ integrationLinks: s.integrationLinks.filter((l) => l.id !== id) })),
+      setSolutionOrder: (order) => set({ solutionOrder: order }),
+      toggleSolutionEnabled: (id) =>
+        set((s) => ({
+          disabledSolutions: s.disabledSolutions.includes(id)
+            ? s.disabledSolutions.filter((x) => x !== id)
+            : [...s.disabledSolutions, id],
+        })),
+      setUsecaseOrder: (order) => set({ usecaseOrder: order }),
+      toggleUsecaseEnabled: (id) =>
+        set((s) => ({
+          disabledUsecases: s.disabledUsecases.includes(id)
+            ? s.disabledUsecases.filter((x) => x !== id)
+            : [...s.disabledUsecases, id],
+        })),
       completeJobReview: (jobId) => {
         const items = get().hitl.filter((h) => h.jobId === jobId);
         const approved = items.filter((h) => h.status === "approved").length;
@@ -295,7 +725,7 @@ export const usePlatform = create<PlatformState>()(
       },
     }),
     {
-      name: "xdas-platform-v4",
+      name: "xdas-platform-v6",
       storage: createJSONStorage(() =>
         typeof window !== "undefined"
           ? window.localStorage

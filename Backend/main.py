@@ -210,11 +210,8 @@ def _build_hitl_items(bot_id: str, records: list[dict], job_id: str) -> list[dic
 
         if bot_id == "tesla-configurator":
             fields = _hitl_fields_tesla(record)
-            # For Tesla, always use the live configurator URL so the backend proxy
-            # fetches the real Tesla website for the HITL LHS preview.
-            live_url = record.get("configurator_url", "") or record.get("Configurator Page Link", "")
-            if live_url:
-                html_file = live_url  # frontend BotHtmlViewer will route http→ /api/proxy
+            # html_file is the local filename (e.g. tesla_modely_india.html); liveUrl
+            # is kept separately so the "Open Live ↗" button still works.
             model_name = record.get("model", "")
             region     = record.get("region", record.get("Country", ""))
             record_name = f"Tesla {model_name} — {region}"
@@ -226,20 +223,23 @@ def _build_hitl_items(bot_id: str, records: list[dict], job_id: str) -> list[dic
             summary     = record_name
             detail      = f"Verify extracted attributes for {record_name} against the BMW configurator source page."
 
+        screenshot_file = record.get("screenshot_file", "") or ""
+        preview_kind = "screenshot" if (screenshot_file and not html_file) else "html"
         items.append({
-            "id":          str(uuid.uuid4()),
-            "jobId":       job_id,
-            "uid":         uid,
-            "htmlFile":    html_file,
-            "liveUrl":     record.get("configurator_url", "") or record.get("Configurator Page Link", ""),
-            "recordName":  record_name,
-            "summary":     summary,
-            "detail":      detail,
-            "fields":      fields,
-            "confidence":  90,
-            "status":      "pending",
-            "createdAt":   datetime.now().isoformat(),
-            "previewKind": "html",
+            "id":             str(uuid.uuid4()),
+            "jobId":          job_id,
+            "uid":            uid,
+            "htmlFile":       html_file,
+            "screenshotFile": screenshot_file,
+            "liveUrl":        record.get("configurator_url", "") or record.get("Configurator Page Link", ""),
+            "recordName":     record_name,
+            "summary":        summary,
+            "detail":         detail,
+            "fields":         fields,
+            "confidence":     90,
+            "status":         "pending",
+            "createdAt":      datetime.now().isoformat(),
+            "previewKind":    preview_kind,
         })
     return items
 
@@ -535,6 +535,20 @@ def update_hitl_item(job_id: str, item_id: str, status: str = Query(...)):
                 rejected = sum(1 for h in job["hitlItems"] if h["status"] == "rejected")
                 job["reviewApproved"] = approved
                 job["reviewRejected"] = rejected
+                # Delete local preview files once approved — no longer needed
+                if status == "approved":
+                    html_filename = item.get("htmlFile", "")
+                    if html_filename and not html_filename.startswith("http"):
+                        try:
+                            (BOT_DIR / "HTML" / html_filename).unlink(missing_ok=True)
+                        except Exception:
+                            pass
+                    ss_filename = item.get("screenshotFile", "")
+                    if ss_filename and not ss_filename.startswith("http"):
+                        try:
+                            (BOT_DIR / "HTML" / "screenshots" / ss_filename).unlink(missing_ok=True)
+                        except Exception:
+                            pass
                 return {"ok": True, "status": status}
         raise HTTPException(status_code=404, detail="HITL item not found")
 
@@ -760,9 +774,7 @@ _PROXY_UA_POOL = [
 
 def _fetch_with_playwright(url: str) -> str | None:
     """
-    Fully-stealthed non-headless Chromium fetch — same approach as the bot.
-    Non-headless + webdriver flag hidden gives the best chance of bypassing
-    CDN bot-detection (Cloudflare, Akamai) that Tesla/BMW use.
+    Headless Chromium fetch with stealth flags to bypass CDN bot-detection.
     """
     try:
         from playwright.sync_api import sync_playwright
@@ -771,7 +783,7 @@ def _fetch_with_playwright(url: str) -> str | None:
     try:
         with sync_playwright() as pw:
             browser = pw.chromium.launch(
-                headless=False,
+                headless=True,
                 args=[
                     "--disable-blink-features=AutomationControlled",
                     "--no-sandbox",
@@ -836,6 +848,32 @@ def _fetch_with_playwright(url: str) -> str | None:
             return html if len(html) > 20_000 else None
     except Exception:
         return None
+
+
+@app.get("/api/screenshot/{filename}")
+def serve_bot_screenshot(filename: str):
+    """Serve a locally saved Playwright screenshot from Bot/HTML/screenshots/."""
+    ss_dir = (BOT_DIR / "HTML" / "screenshots").resolve()
+    file_path = (ss_dir / filename).resolve()
+    if not str(file_path).startswith(str(ss_dir)):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Screenshot not found")
+    return Response(content=file_path.read_bytes(), media_type="image/png")
+
+
+@app.get("/api/html/{filename}")
+def serve_bot_html(filename: str):
+    """Serve a locally saved bot HTML file from Bot/HTML/."""
+    html_dir = (BOT_DIR / "HTML").resolve()
+    file_path = (html_dir / filename).resolve()
+    # Prevent path traversal
+    if not str(file_path).startswith(str(html_dir)):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="HTML file not found")
+    content = file_path.read_text(encoding="utf-8")
+    return Response(content=content, media_type="text/html")
 
 
 @app.get("/api/proxy")

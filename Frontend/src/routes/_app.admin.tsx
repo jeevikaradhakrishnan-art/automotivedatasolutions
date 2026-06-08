@@ -3,11 +3,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   Activity, Search, Upload, Trash2, Power, PowerOff, Edit3, Save, X,
-  FileText, History, Database, Tag as TagIcon, Download, Plus, ExternalLink, Eye, ShieldAlert,
+  FileText, History, Database, Tag as TagIcon, Download, Plus, ExternalLink, Eye, ShieldAlert, GripVertical,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { SOLUTIONS } from "@/data/solutions";
+import { SOLUTIONS, type SolutionId } from "@/data/solutions";
 import { useSolutionOverrides, type SolutionOverride, type SolutionDatasetRow } from "@/hooks/useSolutionOverrides";
+import { usePlatform } from "@/store/platform";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,6 +57,13 @@ function AdminPage() {
   const [previewDs, setPreviewDs] = useState<SolutionDatasetRow | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; body: string; onConfirm: () => void } | null>(null);
 
+  const solutionOrder = usePlatform((s) => s.solutionOrder);
+  const setSolutionOrder = usePlatform((s) => s.setSolutionOrder);
+  const dragIdx = useRef<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  const isFilterActive = !!query || statusFilter !== "all";
+
   useEffect(() => {
     const loadDs = async () => {
       const { data } = await supabase
@@ -83,7 +91,7 @@ function AdminPage() {
   }, []);
 
   const merged = useMemo(() => {
-    return SOLUTIONS.map((s) => {
+    const items = SOLUTIONS.map((s) => {
       const o = overrides[s.id];
       return {
         id: s.id,
@@ -100,7 +108,10 @@ function AdminPage() {
         updatedAt: o?.updated_at,
       };
     });
-  }, [overrides]);
+    return solutionOrder
+      .map((id) => items.find((s) => s.id === id))
+      .filter(Boolean) as typeof items;
+  }, [overrides, solutionOrder]);
 
   const filtered = merged.filter((s) => {
     const q = query.toLowerCase();
@@ -177,19 +188,43 @@ function AdminPage() {
 
       {/* Solutions list */}
       <div className="space-y-3">
+        {!isFilterActive && (
+          <p className="text-[10px] font-mono text-muted-foreground tracking-widest pl-1">
+            DRAG TO REORDER · ORDER REFLECTS ON HOME PAGE
+          </p>
+        )}
         {loading && (
           <div className="panel p-8 text-center text-sm text-muted-foreground">Loading…</div>
         )}
         {!loading &&
-          filtered.map((s) => {
+          filtered.map((s, idx) => {
             const dsForSol = datasets.filter((d) => d.solution_id === s.id);
             const isEditing = editing === s.id;
+            const isDragTarget = !isFilterActive && dragOverIdx === idx && dragIdx.current !== null && dragIdx.current !== idx;
             return (
               <div
                 key={s.id}
-                className={`panel overflow-hidden transition ${!s.enabled ? "opacity-70" : ""}`}
+                draggable={!isFilterActive}
+                onDragStart={() => { dragIdx.current = idx; }}
+                onDragOver={(e) => { e.preventDefault(); if (!isFilterActive) setDragOverIdx(idx); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const from = dragIdx.current;
+                  if (from === null || from === idx || isFilterActive) { dragIdx.current = null; setDragOverIdx(null); return; }
+                  const next = [...solutionOrder];
+                  const [moved] = next.splice(from, 1);
+                  next.splice(idx, 0, moved);
+                  setSolutionOrder(next as SolutionId[]);
+                  dragIdx.current = null;
+                  setDragOverIdx(null);
+                }}
+                onDragEnd={() => { dragIdx.current = null; setDragOverIdx(null); }}
+                className={`panel overflow-hidden transition select-none ${!s.enabled ? "opacity-70" : ""} ${isDragTarget ? "border-cyan/50 ring-1 ring-cyan/20" : ""}`}
               >
-                <div className="px-5 py-4 flex items-start gap-4 border-b border-border">
+                <div className="px-4 py-4 flex items-start gap-3 border-b border-border">
+                  {!isFilterActive && (
+                    <GripVertical className="size-5 text-muted-foreground/60 mt-0.5 shrink-0 cursor-grab active:cursor-grabbing" />
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-[10px] tracking-widest text-muted-foreground">

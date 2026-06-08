@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
-import { Command as CommandIcon, ChevronDown, LayoutGrid, Sparkles } from "lucide-react";
+import { Command as CommandIcon, LayoutGrid, Sparkles } from "lucide-react";
 import { usePlatform } from "@/store/platform";
 import { SOLUTIONS } from "@/data/solutions";
 import { CAPABILITIES } from "@/data/capabilities";
@@ -134,17 +134,7 @@ function SubNav() {
 }
 
 function TopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
-  const [time, setTime] = useState<string>("");
-  const [menuOpen, setMenuOpen] = useState(false);
   const runningJobs = usePlatform((s) => s.jobs.filter((j) => j.status === "running").length);
-
-  useEffect(() => {
-    const tick = () => setTime(new Date().toUTCString().split(" ")[4]);
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
-
 
   return (
     <header className="h-14 border-b border-border bg-card/80 backdrop-blur-xl flex items-stretch shadow-sm">
@@ -179,38 +169,6 @@ function TopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
           <span>{runningJobs} live job{runningJobs === 1 ? "" : "s"}</span>
         </div>
       </div>
-
-      {/* User + segmented nav below */}
-      <div className="flex flex-col border-l border-border">
-        <div className="h-14 flex items-center gap-2 px-3">
-          <span suppressHydrationWarning className="text-[10px] font-mono text-muted-foreground tabular-nums w-[58px] text-right">{time ? `${time} UTC` : ""}</span>
-          <button
-            onClick={() => setMenuOpen((v) => !v)}
-            className="h-9 pl-2 pr-2 flex items-center gap-2 rounded-md border border-border hover:border-primary/30 transition relative"
-          >
-            <div className="size-6 rounded bg-gradient-to-br from-primary to-amber/70 grid place-items-center text-[10px] font-bold text-primary-foreground">EM</div>
-            <div className="text-xs leading-tight text-left">
-              <div className="font-medium">E. Mercer</div>
-              <div className="text-[10px] text-muted-foreground font-mono">DATA OPS</div>
-            </div>
-            <ChevronDown className={`size-3.5 text-muted-foreground transition ${menuOpen ? "rotate-180" : ""}`} />
-            {menuOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-48 panel py-1 z-50 text-xs text-left" onClick={(e) => e.stopPropagation()}>
-                <div className="px-3 py-2 border-b border-border">
-                  <div className="font-medium">E. Mercer</div>
-                  <div className="text-[10px] font-mono text-muted-foreground">data-ops@xdas.io</div>
-                </div>
-                <button className="w-full text-left px-3 py-1.5 hover:bg-surface-elevated">Account settings</button>
-                <button className="w-full text-left px-3 py-1.5 hover:bg-surface-elevated">Preferences</button>
-                <div className="border-t border-border my-1" />
-                <button className="w-full text-left px-3 py-1.5 hover:bg-surface-elevated text-danger">Sign out</button>
-              </div>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {menuOpen && <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />}
     </header>
   );
 }

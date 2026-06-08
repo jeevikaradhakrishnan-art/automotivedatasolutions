@@ -1,11 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { SolutionCard } from "@/components/solutions/SolutionCard";
-import { useEffectiveSolutions } from "@/hooks/useSolutionOverrides";
+import { useEffectiveSolutions, type EffectiveSolution } from "@/hooks/useSolutionOverrides";
+import { usePlatform } from "@/store/platform";
+import type { SolutionId } from "@/data/solutions";
 
 export const Route = createFileRoute("/_app/")({ component: SolutionsLanding });
 
 function SolutionsLanding() {
-  const solutions = useEffectiveSolutions();
+  const allSolutions = useEffectiveSolutions(true);
+  const solutionOrder = usePlatform((s) => s.solutionOrder);
+  const disabledSolutions = usePlatform((s) => s.disabledSolutions);
+
+  const solutions = useMemo((): EffectiveSolution[] => {
+    return solutionOrder
+      .map((id) => allSolutions.find((s) => s.id === id))
+      .filter((s): s is EffectiveSolution => s != null && !disabledSolutions.includes(s.id as SolutionId));
+  }, [allSolutions, solutionOrder, disabledSolutions]);
+
   return (
     <div className="p-5 space-y-5">
       <div>

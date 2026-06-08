@@ -1,11 +1,12 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutGrid, Sparkles, ClipboardCheck, Shield, ExternalLink } from "lucide-react";
+import { LayoutGrid, Sparkles, ClipboardCheck, Shield, ExternalLink, Settings2 } from "lucide-react";
 import { usePlatform } from "@/store/platform";
 
 const nav = [
   { to: "/",             label: "Solutions",      icon: LayoutGrid,     code: "SOL", exact: true },
   { to: "/hitl",         label: "Review · HITL",  icon: ClipboardCheck, code: "QA"  },
   { to: "/capabilities", label: "Capabilities",   icon: Sparkles,       code: "CAP" },
+  { to: "/manage",       label: "Manage",         icon: Settings2,      code: "MGT" },
 ];
 
 

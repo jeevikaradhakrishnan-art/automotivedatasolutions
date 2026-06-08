@@ -5,7 +5,7 @@ const BOT_API = typeof window !== "undefined"
   : "http://localhost:8000";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
-  Check, X, ClipboardCheck, Filter, FileText, Globe,
+  Check, X, ClipboardCheck, Filter, FileText, Globe, Camera,
   ChevronLeft, ChevronRight, Info, Search, SkipForward, ArrowRight, Layers, Lock,
   ZoomIn, ZoomOut, Languages, Plus, MessageSquare, Sparkles, Keyboard, History,
   Activity, Gauge, ChevronDown, MapPin, Save, Circle, MousePointerClick,
@@ -39,7 +39,7 @@ function HitlPage() {
 
   // Build batches grouped by jobId (review-stage jobs only)
   const batches = useMemo(() => {
-    const map = new Map<string, { job: Job; items: HitlItem[]; previewKind: "html" | "pdf" }>();
+    const map = new Map<string, { job: Job; items: HitlItem[]; previewKind: "html" | "pdf" | "screenshot" }>();
     hitl.forEach((h) => {
       if (!h.jobId) return;
       const job = jobs.find((j) => j.id === h.jobId);
@@ -232,7 +232,7 @@ function ValidationScreen({
 }: {
   job: Job;
   items: HitlItem[];
-  previewKind: "html" | "pdf";
+  previewKind: "html" | "pdf" | "screenshot";
   onBack: () => void;
   onResolve: (id: string, status: HitlStatus) => void;
   onComplete: () => void;
@@ -252,7 +252,7 @@ function ValidationScreen({
   // Premium UI state
   const [zoom, setZoom] = useState(100);
   const [lhsSearch, setLhsSearch] = useState("");
-  const [view, setView] = useState<"html" | "pdf">(previewKind);
+  const [view, setView] = useState<"html" | "pdf" | "screenshot">(previewKind);
   const [language, setLanguage] = useState<"original" | "translated">("original");
   const [selectedField, setSelectedField] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -264,7 +264,7 @@ function ValidationScreen({
   const [showAudit, setShowAudit] = useState(false);
   const [manualAnnot, setManualAnnot] = useState<Record<string, true>>({});
   const [confOverride, setConfOverride] = useState<Record<string, "high" | "medium" | "low">>({});
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; text: string; editable?: boolean } | null>(null);
   const [ctxQuery, setCtxQuery] = useState("");
   const [auditLog, setAuditLog] = useState<{ at: string; msg: string; tone: "cyan" | "success" | "danger" | "amber" }[]>(
     () => [{ at: new Date().toISOString(), msg: `Batch opened · ${items.length} records loaded from ${job.source}`, tone: "cyan" }]
@@ -488,14 +488,25 @@ function ValidationScreen({
             onContextMenu={(e) => {
               const sel = window.getSelection?.();
               const text = sel?.toString().trim() ?? "";
-              if (!text) return;
+              const isScreenshot = !!(item.screenshotFile && !item.htmlFile);
+              if (!text && !isScreenshot) return;
               e.preventDefault();
               setCtxQuery("");
-              setCtxMenu({ x: e.clientX, y: e.clientY, text });
+              setCtxMenu({ x: e.clientX, y: e.clientY, text, editable: isScreenshot && !text });
             }}
           >
-            <div style={{ zoom: item.liveUrl ? undefined : `${zoom}%` }} className="transition-all">
-              {item.liveUrl && view === "html" ? (
+            <div style={{ zoom: (item.liveUrl || item.htmlFile || item.screenshotFile) ? undefined : `${zoom}%` }} className="transition-all">
+              {(item.htmlFile && !item.htmlFile.startsWith("http")) && view === "html" ? (
+                <BotHtmlViewer
+                  key={item.id}
+                  item={item}
+                  allFields={allFields}
+                  selectedField={selectedField}
+                  onIframe={setBotIframeEl}
+                />
+              ) : item.screenshotFile && view === "html" ? (
+                <ScreenshotViewer item={item} zoom={zoom} />
+              ) : item.liveUrl && view === "html" ? (
                 <BotHtmlViewer
                   key={item.id}
                   item={item}
@@ -758,9 +769,19 @@ function ValidationScreen({
                 <div className="flex items-center gap-1.5 text-[10px] font-mono tracking-widest text-cyan">
                   <MousePointerClick className="size-3" /> ASSIGN TO ATTRIBUTE
                 </div>
-                <div className="text-[11px] font-mono mt-1 truncate text-foreground" title={ctxMenu.text}>
-                  “{ctxMenu.text}”
-                </div>
+                {ctxMenu.editable ? (
+                  <input
+                    autoFocus
+                    value={ctxMenu.text}
+                    onChange={(e) => setCtxMenu((m) => m ? { ...m, text: e.target.value } : null)}
+                    placeholder="Type value from screenshot…"
+                    className="mt-1 w-full h-7 px-2 rounded-md bg-input border border-cyan/40 text-[11px] font-mono focus:outline-none"
+                  />
+                ) : (
+                  <div className="text-[11px] font-mono mt-1 truncate text-foreground" title={ctxMenu.text}>
+                    "{ctxMenu.text}"
+                  </div>
+                )}
               </div>
               <div className="p-2 border-b border-border">
                 <div className="relative">
@@ -993,6 +1014,37 @@ function injectAnnotationLayer(html: string): string {
   return html + layer;
 }
 
+// ── Screenshot viewer: shows Playwright screenshot, supports zoom ─────────────
+function ScreenshotViewer({ item, zoom }: { item: HitlItem; zoom: number }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1.5 px-2 py-1 rounded border border-amber/30 bg-amber/5 text-[10px] font-mono text-amber">
+        <Camera className="size-3 shrink-0" />
+        <span>Screenshot preview — right-click anywhere to manually annotate a value</span>
+        {item.liveUrl && (
+          <a
+            href={item.liveUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto shrink-0 px-2 py-0.5 rounded bg-amber/20 hover:bg-amber/30 border border-amber/40 transition-colors"
+          >
+            Open Live ↗
+          </a>
+        )}
+      </div>
+      <div className="overflow-auto rounded border border-border" style={{ maxHeight: "66vh" }}>
+        <img
+          src={`${BOT_API}/api/screenshot/${encodeURIComponent(item.screenshotFile!)}`}
+          alt={item.recordName ?? "screenshot"}
+          style={{ width: "100%", transformOrigin: "top left", transform: `scale(${zoom / 100})` }}
+          draggable={false}
+          className="block"
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── Bot HTML viewer: fetches, injects annotation layer, renders via srcdoc ───
 function BotHtmlViewer({
   item, allFields, selectedField, onIframe,
@@ -1009,17 +1061,22 @@ function BotHtmlViewer({
   // Pass iframe element up so parent can postMessage to it
   useEffect(() => { onIframe(iframeRef.current); }, [loaded]); // eslint-disable-line
 
-  // Fetch + inject on item change — always use live proxy
+  // Fetch + inject on item change — prefer local HTML file, fall back to proxy
   useEffect(() => {
     setLoaded(false);
     setSrcdoc("");
-    if (!item.liveUrl) return;
-    const sourceUrl = `${BOT_API}/api/proxy?url=${encodeURIComponent(item.liveUrl)}`;
+    const isLocal = item.htmlFile && !item.htmlFile.startsWith("http");
+    const sourceUrl = isLocal
+      ? `${BOT_API}/api/html/${encodeURIComponent(item.htmlFile!)}`
+      : item.liveUrl
+        ? `${BOT_API}/api/proxy?url=${encodeURIComponent(item.liveUrl)}`
+        : null;
+    if (!sourceUrl) return;
     fetch(sourceUrl)
       .then((r) => r.text())
       .then((html) => setSrcdoc(injectAnnotationLayer(html)))
       .catch(() => setSrcdoc(`<html><body style="font-family:sans-serif;padding:20px;color:#666"><p>Could not load source page.</p></body></html>`));
-  }, [item.liveUrl, item.id]);
+  }, [item.htmlFile, item.liveUrl, item.id]);
 
   // Send highlights when iframe is ready or fields change
   useEffect(() => {
@@ -1040,7 +1097,11 @@ function BotHtmlViewer({
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2 px-2 py-1 rounded border border-cyan/30 bg-cyan/5 text-[10px] font-mono text-cyan">
         <Globe className="size-3" />
-        <span className="truncate">{item.liveUrl}</span>
+        {item.htmlFile && !item.htmlFile.startsWith("http") ? (
+          <span className="truncate text-amber">Local HTML: {item.htmlFile}</span>
+        ) : (
+          <span className="truncate">{item.liveUrl}</span>
+        )}
         {item.uid && <span className="ml-auto shrink-0 text-muted-foreground">UID: {item.uid}</span>}
         {item.liveUrl && (
           <a
@@ -1080,7 +1141,7 @@ function SourceWithHighlights({
 }: {
   solutionId: string;
   item: HitlItem;
-  view: "html" | "pdf";
+  view: "html" | "pdf" | "screenshot";
   selectedField: string | null;
   search: string;
   language: "original" | "translated";
@@ -1159,10 +1220,10 @@ function UseCaseTag({ solId }: { solId: string }) {
   );
 }
 
-function FormatTag({ kind }: { kind: "html" | "pdf" }) {
-  return kind === "pdf"
-    ? <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 text-amber bg-amber/10 flex items-center gap-1"><FileText className="size-3" /> PDF</span>
-    : <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-cyan/40 text-cyan bg-cyan/10 flex items-center gap-1"><Globe className="size-3" /> HTML</span>;
+function FormatTag({ kind }: { kind: "html" | "pdf" | "screenshot" }) {
+  if (kind === "pdf") return <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 text-amber bg-amber/10 flex items-center gap-1"><FileText className="size-3" /> PDF</span>;
+  if (kind === "screenshot") return <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-violet/40 text-violet bg-violet/10 flex items-center gap-1"><Camera className="size-3" /> Screenshot</span>;
+  return <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-cyan/40 text-cyan bg-cyan/10 flex items-center gap-1"><Globe className="size-3" /> HTML</span>;
 }
 
 function Stat({ label, value, tone }: { label: string; value: number; tone: "amber" | "success" | "danger" }) {

@@ -32,6 +32,8 @@ const generateId = (): string => {
 
 type Tab = "sources" | "workflows" | "jobs" | "review" | "data" | "integrations" | "insights";
 
+const JOB_STATUS_ORDER: Record<string, number> = { success: 0, review: 1, failed: 2, queued: 3, running: 4 };
+
 export const Route = createFileRoute("/_app/solutions/$id")({
   validateSearch: (search: Record<string, unknown>) => ({
     tab: (search.tab as Tab | undefined),
@@ -47,6 +49,7 @@ function SolutionDetail() {
   const [tab, setTab] = useState<Tab>(tabParam ?? "sources");
   const [openInsight, setOpenInsight] = useState<NewsInsight | null>(null);
   const [openJobId, setOpenJobId] = useState<string | null>(null);
+  const [jobFilter, setJobFilter] = useState<"all" | "success" | "review" | "failed">("all");
 
   const subscribed = usePlatform((s) => s.subscriptions.includes(solution?.id ?? "vehicle-spec"));
   const toggleSub = usePlatform((s) => s.toggleSubscription);
@@ -70,6 +73,13 @@ function SolutionDetail() {
 
   const workflows = getWorkflowsFor(solution.id);
   const jobs = allJobs.filter((j) => j.solutionId === solution.id);
+
+  const filteredJobs = useMemo(() => {
+    const sorted = [...jobs].sort(
+      (a, b) => (JOB_STATUS_ORDER[a.status] ?? 5) - (JOB_STATUS_ORDER[b.status] ?? 5),
+    );
+    return jobFilter === "all" ? sorted : sorted.filter((j) => j.status === jobFilter);
+  }, [jobs, jobFilter]);
 
   // Map source script name → backend bot_id
   const sourceToBotId = (script?: string): string | null => {
@@ -144,9 +154,10 @@ function SolutionDetail() {
                   id:          h.id as string,
                   solutionId:  solution.id,
                   jobId:       localJobId,
-                  uid:         h.uid as string | undefined,
-                  htmlFile:    h.htmlFile as string | undefined,
-                  liveUrl:     h.liveUrl as string | undefined,
+                  uid:            h.uid as string | undefined,
+                  htmlFile:       h.htmlFile as string | undefined,
+                  screenshotFile: h.screenshotFile as string | undefined,
+                  liveUrl:        h.liveUrl as string | undefined,
                   recordName:  h.recordName as string | undefined,
                   summary:     h.summary as string,
                   detail:      h.detail as string,
@@ -371,7 +382,30 @@ function SolutionDetail() {
       )}
 
       {tab === "jobs" && (
-        <JobsTable jobs={jobs} onDownload={handleDownload} onAbort={handleAbort} onSelect={(j) => setOpenJobId(j.id)} />
+        <div className="space-y-3">
+          {/* Filter tabs */}
+          <div className="flex gap-1 p-0.5 rounded-lg border border-border bg-card shadow-sm w-fit flex-wrap">
+            {(["all", "success", "review", "failed"] as const).map((f) => {
+              const labels = { all: "All", success: "Completed", review: "Pending Review", failed: "Failed" };
+              const count = f === "all" ? jobs.length : jobs.filter((j) => j.status === f).length;
+              return (
+                <button
+                  key={f}
+                  onClick={() => setJobFilter(f)}
+                  className={`flex items-center gap-1.5 px-3 h-7 rounded-md text-xs font-medium transition ${
+                    jobFilter === f
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-surface-elevated"
+                  }`}
+                >
+                  {labels[f]}
+                  <span className="font-mono text-[10px] px-1 rounded bg-black/10 dark:bg-white/10">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+          <JobsTable jobs={filteredJobs} onDownload={handleDownload} onAbort={handleAbort} onSelect={(j) => setOpenJobId(j.id)} />
+        </div>
       )}
 
       {tab === "review" && (

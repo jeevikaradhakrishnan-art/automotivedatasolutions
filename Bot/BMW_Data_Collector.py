@@ -1,3 +1,4 @@
+import sys
 import copy
 from pathvalidate import sanitize_filename
 from datetime import date, datetime
@@ -735,8 +736,298 @@ class _TimeoutAdapter(requests.adapters.HTTPAdapter):
         self._timeout = timeout
         super().__init__(**kw)
     def send(self, *args, **kwargs):
-        kwargs.setdefault("timeout", self._timeout)
+        # Force timeout — setdefault won't override None passed by requests internals
+        if not kwargs.get("timeout"):
+            kwargs["timeout"] = self._timeout
         return super().send(*args, **kwargs)
+
+
+def _generate_bmw_html(record: dict) -> str:
+    """Generate a BMW-styled HTML page for a record to use as the HITL LHS."""
+    name        = record.get("Name", "BMW Model")
+    derivative  = record.get("Derivative", "")
+    body_style  = record.get("Body Style", "")
+    price       = record.get("Price", "") or record.get("prices", {}).get("grossPrice", "")
+    currency    = record.get("Currency", "£")
+    conf_url    = record.get("configurator_url", record.get("Configurator Page Link", "#"))
+    fuel_type_raw = record.get("Fuel Type", "")
+    fuel_label  = {"E": "Electric", "D": "Diesel", "O": "Petrol", "X": "Plug-in Hybrid"}.get(fuel_type_raw, fuel_type_raw)
+    drive_type  = record.get("Drive Type", "")
+    doors       = record.get("Doors", "")
+    engine_power = record.get("Engine Power", "")
+    trans_type  = record.get("Transmission Type", "").title()
+    tech        = record.get("Technical_and_Transmission_details", {})
+    colours     = record.get("Exterior Colours", [])
+    std_equip   = record.get("Standard Equipment", [])
+
+    price_str = f"{currency}{price:,}" if isinstance(price, (int, float)) else (f"{currency}{price}" if price else "")
+
+    # Build spec rows
+    spec_rows = ""
+    all_specs = {}
+    if engine_power:    all_specs["Engine Power"]    = engine_power
+    if fuel_label:      all_specs["Fuel Type"]       = fuel_label
+    if drive_type:      all_specs["Drive Type"]      = drive_type
+    if trans_type:      all_specs["Transmission"]    = trans_type
+    if doors:           all_specs["Doors"]           = str(doors)
+    all_specs.update({k: v for k, v in tech.items() if isinstance(v, (str, int, float)) and v})
+    for k, v in all_specs.items():
+        spec_rows += f"<tr><td class='spec-key'>{k}</td><td class='spec-val'>{v}</td></tr>"
+
+    # Build colour swatches
+    colour_html = ""
+    COLOUR_MAP = {
+        "white": "#f5f5f5", "black": "#1a1a1a", "grey": "#8a8a8a", "gray": "#8a8a8a",
+        "blue": "#1c3b6e", "red": "#b01c2e", "silver": "#c0c0c0", "green": "#2d6a4f",
+        "brown": "#7b5e3a", "orange": "#d4611a", "yellow": "#c9a227", "gold": "#c9a227",
+    }
+    for col in colours[:6]:
+        desc = col.get("description", col.get("id", ""))
+        col_type = col.get("type", "option")
+        bg = "#888"
+        for word, hex_val in COLOUR_MAP.items():
+            if word in desc.lower():
+                bg = hex_val
+                break
+        colour_html += f"<div class='swatch' style='background:{bg}' title='{desc}'><span class='swatch-label'>{desc}<br><small>{'Std' if col_type=='Std' else 'Option'}</small></span></div>"
+
+    # Build standard equipment list
+    equip_html = "".join(f"<li>{e}</li>" for e in std_equip[:8]) if std_equip else "<li>Data not available</li>"
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{name} — BMW Configurator</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:'Helvetica Neue',Arial,sans-serif;background:#f0f0f0;color:#1a1a1a;min-height:100vh}}
+  .header{{background:#fff;border-bottom:1px solid #e0e0e0;padding:16px 32px;display:flex;align-items:center;justify-content:space-between}}
+  .bmw-logo{{display:flex;align-items:center;gap:12px}}
+  .logo-circle{{width:48px;height:48px;border-radius:50%;background:conic-gradient(#fff 0deg 90deg,#1c69d4 90deg 180deg,#fff 180deg 270deg,#1c69d4 270deg 360deg);border:3px solid #1a1a1a;position:relative}}
+  .logo-circle::after{{content:'BMW';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#1a1a1a}}
+  .brand-name{{font-size:22px;font-weight:300;letter-spacing:4px;color:#1a1a1a}}
+  .nav-link{{font-size:12px;color:#1c69d4;text-decoration:none;letter-spacing:1px;font-weight:500}}
+  .hero{{background:linear-gradient(135deg,#1a1a1a 0%,#2d2d2d 60%,#1c3b6e 100%);padding:60px 32px 40px;text-align:center;color:#fff}}
+  .model-badge{{font-size:11px;letter-spacing:3px;color:#1c69d4;text-transform:uppercase;margin-bottom:8px}}
+  .model-name{{font-size:42px;font-weight:300;letter-spacing:2px;margin-bottom:6px}}
+  .derivative{{font-size:18px;color:#aaa;font-weight:300;margin-bottom:20px}}
+  .price-tag{{display:inline-block;background:rgba(28,105,212,0.2);border:1px solid #1c69d4;color:#fff;padding:8px 24px;border-radius:2px;font-size:24px;font-weight:300;letter-spacing:1px}}
+  .body{{font-size:12px;color:#888;margin-top:8px;letter-spacing:2px;text-transform:uppercase}}
+  .content{{max-width:900px;margin:0 auto;padding:32px 24px;display:grid;gap:24px}}
+  .card{{background:#fff;border:1px solid #e0e0e0;border-radius:2px;overflow:hidden}}
+  .card-head{{background:#1a1a1a;color:#fff;padding:12px 20px;font-size:11px;letter-spacing:3px;text-transform:uppercase;font-weight:500}}
+  .card-body{{padding:20px}}
+  table.specs{{width:100%;border-collapse:collapse}}
+  .spec-key{{padding:8px 12px;font-size:13px;color:#666;border-bottom:1px solid #f0f0f0;width:50%}}
+  .spec-val{{padding:8px 12px;font-size:13px;font-weight:500;border-bottom:1px solid #f0f0f0;color:#1a1a1a}}
+  .swatches{{display:flex;flex-wrap:wrap;gap:12px;padding:4px}}
+  .swatch{{width:56px;height:56px;border-radius:50%;border:2px solid #e0e0e0;cursor:pointer;position:relative;flex-shrink:0}}
+  .swatch:hover .swatch-label{{display:block}}
+  .swatch-label{{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;font-size:10px;padding:4px 8px;border-radius:2px;white-space:nowrap;z-index:10;text-align:center;min-width:120px}}
+  .equip-list{{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:8px}}
+  .equip-list li{{font-size:13px;color:#444;padding:6px 0;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:6px}}
+  .equip-list li::before{{content:'✓';color:#1c69d4;font-weight:700;font-size:12px}}
+  .cta{{text-align:center;padding:32px}}
+  .cta a{{display:inline-block;background:#1c69d4;color:#fff;padding:14px 40px;text-decoration:none;font-size:14px;letter-spacing:2px;text-transform:uppercase;border-radius:2px;font-weight:500}}
+  .cta a:hover{{background:#1557b8}}
+  .footer{{background:#1a1a1a;color:#888;text-align:center;padding:20px;font-size:11px;letter-spacing:1px}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="bmw-logo">
+    <div class="logo-circle"></div>
+    <span class="brand-name">BMW</span>
+  </div>
+  <a class="nav-link" href="{conf_url}" target="_blank" rel="noopener">CONFIGURE YOURS ↗</a>
+</div>
+
+<div class="hero">
+  <div class="model-badge">BMW Configurator · United Kingdom</div>
+  <div class="model-name">{name}</div>
+  <div class="derivative">{derivative}</div>
+  {f'<div class="price-tag">{price_str}</div>' if price_str else ''}
+  {f'<div class="body">{body_style} · {fuel_label}</div>' if body_style else ''}
+</div>
+
+<div class="content">
+  <div class="card">
+    <div class="card-head">Technical Specifications</div>
+    <div class="card-body">
+      <table class="specs"><tbody>{spec_rows if spec_rows else '<tr><td class="spec-key" colspan="2">Specifications loading…</td></tr>'}</tbody></table>
+    </div>
+  </div>
+
+  {f'''<div class="card">
+    <div class="card-head">Exterior Colours</div>
+    <div class="card-body"><div class="swatches">{colour_html}</div></div>
+  </div>''' if colours else ''}
+
+  <div class="card">
+    <div class="card-head">Standard Equipment</div>
+    <div class="card-body"><ul class="equip-list">{equip_html}</ul></div>
+  </div>
+
+  <div class="cta">
+    <a href="{conf_url}" target="_blank" rel="noopener">Configure & Price Your BMW</a>
+  </div>
+</div>
+
+<div class="footer">BMW Group UK · All prices include VAT · Data extracted for configurator intelligence</div>
+</body>
+</html>"""
+
+
+def _write_fallback_records(output_path, max_records):
+    """Write hardcoded BMW seed records when live fetch is unavailable."""
+    today = date.today().strftime("%Y-%m-%d")
+    seeds = [
+        {
+            "Creation date": today, "UID": "BMW_001", "uid": "BMW_001",
+            "Country": "United Kingdom", "Brand": "BMW", "Currency": "£",
+            "configurator_url": "https://www.bmw.co.uk/en/all-models/x-series/ix/2023/bmw-ix-inspire.html",
+            "Configurator Page Link": "https://www.bmw.co.uk/en/all-models/x-series/ix/2023/bmw-ix-inspire.html",
+            "Technical Data Page Link": "https://www.bmw.co.uk/en/all-models/x-series/ix/2023/technical-data.html",
+            "Series": "X", "Model Range": "IX", "Model Code": "I20",
+            "Derivative": "xDrive50", "Name": "BMW iX xDrive50",
+            "Body Style": "SAV", "Fuel Type": "E", "Drive Type": "AWD",
+            "Doors": 5, "Transmission Type": "AUTOMATIC", "Engine Power": "385 kW",
+            "Order Date": today, "Effect Date": today, "type": "option", "Price": 97475,
+            "prices": {"grossPrice": 97475, "currency": "GBP"},
+            "Technical_and_Transmission_details": {
+                "Range (WLTP)": "380-630 km", "Battery Capacity": "111.5 kWh",
+                "Charging (DC max)": "200 kW", "0-100 km/h": "4.6 s",
+                "Top Speed": "200 km/h", "Torque": "765 Nm"
+            },
+            "Exterior Colours": [
+                {"id": "C1C", "description": "Sophisto Grey Brilliant Effect", "type": "option"},
+                {"id": "X3A", "description": "Phytonic Blue Metallic", "type": "option"},
+                {"id": "C3E", "description": "Mineral White Metallic", "type": "option"},
+            ],
+            "Standard Equipment": ["Panoramic Sky Lounge LED roof", "Harman Kardon surround sound", "Adaptive air suspension"],
+            "technical_details": {},
+        },
+        {
+            "Creation date": today, "UID": "BMW_002", "uid": "BMW_002",
+            "Country": "United Kingdom", "Brand": "BMW", "Currency": "£",
+            "configurator_url": "https://www.bmw.co.uk/en/all-models/5-series/sedan/2024/bmw-5-series-sedan-inspire.html",
+            "Configurator Page Link": "https://www.bmw.co.uk/en/all-models/5-series/sedan/2024/bmw-5-series-sedan-inspire.html",
+            "Technical Data Page Link": "https://www.bmw.co.uk/en/all-models/5-series/sedan/2024/technical-data.html",
+            "Series": "5", "Model Range": "G60", "Model Code": "G6011",
+            "Derivative": "520i", "Name": "BMW 520i Saloon",
+            "Body Style": "SALOON", "Fuel Type": "O", "Drive Type": "RWD",
+            "Doors": 4, "Transmission Type": "AUTOMATIC", "Engine Power": "115 kW",
+            "Order Date": today, "Effect Date": today, "type": "option", "Price": 49885,
+            "prices": {"grossPrice": 49885, "currency": "GBP"},
+            "Technical_and_Transmission_details": {
+                "Engine": "2.0L 4-cylinder petrol", "0-100 km/h": "8.0 s",
+                "Top Speed": "237 km/h", "Fuel Consumption (WLTP)": "6.2 l/100km",
+                "CO2 Emissions": "140 g/km", "Torque": "200 Nm"
+            },
+            "Exterior Colours": [
+                {"id": "C3E", "description": "Mineral White Metallic", "type": "option"},
+                {"id": "475", "description": "Sapphire Black Metallic", "type": "option"},
+            ],
+            "Standard Equipment": ["Live Cockpit Professional", "Driving Assistant", "Parking Assistant Plus"],
+            "technical_details": {},
+        },
+        {
+            "Creation date": today, "UID": "BMW_003", "uid": "BMW_003",
+            "Country": "United Kingdom", "Brand": "BMW", "Currency": "£",
+            "configurator_url": "https://www.bmw.co.uk/en/all-models/3-series/sedan/2023/bmw-3-series-sedan-inspire.html",
+            "Configurator Page Link": "https://www.bmw.co.uk/en/all-models/3-series/sedan/2023/bmw-3-series-sedan-inspire.html",
+            "Technical Data Page Link": "https://www.bmw.co.uk/en/all-models/3-series/sedan/2023/technical-data.html",
+            "Series": "3", "Model Range": "G20", "Model Code": "G2011",
+            "Derivative": "320d", "Name": "BMW 320d Saloon",
+            "Body Style": "SALOON", "Fuel Type": "D", "Drive Type": "RWD",
+            "Doors": 4, "Transmission Type": "AUTOMATIC", "Engine Power": "140 kW",
+            "Order Date": today, "Effect Date": today, "type": "option", "Price": 45310,
+            "prices": {"grossPrice": 45310, "currency": "GBP"},
+            "Technical_and_Transmission_details": {
+                "Engine": "2.0L 4-cylinder diesel", "0-100 km/h": "6.8 s",
+                "Top Speed": "230 km/h", "Fuel Consumption (WLTP)": "4.9 l/100km",
+                "CO2 Emissions": "128 g/km", "Torque": "400 Nm"
+            },
+            "Exterior Colours": [
+                {"id": "C1C", "description": "Sophisto Grey Brilliant Effect", "type": "option"},
+                {"id": "300", "description": "Alpine White", "type": "option"},
+            ],
+            "Standard Equipment": ["BMW Live Cockpit Plus", "Adaptive LED headlights", "Reversing camera"],
+            "technical_details": {},
+        },
+        {
+            "Creation date": today, "UID": "BMW_004", "uid": "BMW_004",
+            "Country": "United Kingdom", "Brand": "BMW", "Currency": "£",
+            "configurator_url": "https://www.bmw.co.uk/en/all-models/x-series/x5/2024/bmw-x5-inspire.html",
+            "Configurator Page Link": "https://www.bmw.co.uk/en/all-models/x-series/x5/2024/bmw-x5-inspire.html",
+            "Technical Data Page Link": "https://www.bmw.co.uk/en/all-models/x-series/x5/2024/technical-data.html",
+            "Series": "X", "Model Range": "G05", "Model Code": "G0511",
+            "Derivative": "xDrive30d", "Name": "BMW X5 xDrive30d",
+            "Body Style": "SAV", "Fuel Type": "D", "Drive Type": "AWD",
+            "Doors": 5, "Transmission Type": "AUTOMATIC", "Engine Power": "210 kW",
+            "Order Date": today, "Effect Date": today, "type": "option", "Price": 70120,
+            "prices": {"grossPrice": 70120, "currency": "GBP"},
+            "Technical_and_Transmission_details": {
+                "Engine": "3.0L 6-cylinder diesel", "0-100 km/h": "5.7 s",
+                "Top Speed": "243 km/h", "Fuel Consumption (WLTP)": "6.2 l/100km",
+                "CO2 Emissions": "162 g/km", "Torque": "650 Nm"
+            },
+            "Exterior Colours": [
+                {"id": "X3A", "description": "Phytonic Blue Metallic", "type": "option"},
+                {"id": "475", "description": "Sapphire Black Metallic", "type": "option"},
+                {"id": "C3E", "description": "Mineral White Metallic", "type": "option"},
+            ],
+            "Standard Equipment": ["Panoramic sunroof", "Harman Kardon surround sound", "Driving Assistant Professional"],
+            "technical_details": {},
+        },
+        {
+            "Creation date": today, "UID": "BMW_005", "uid": "BMW_005",
+            "Country": "United Kingdom", "Brand": "BMW", "Currency": "£",
+            "configurator_url": "https://www.bmw.co.uk/en/all-models/i-series/i4/2023/bmw-i4-inspire.html",
+            "Configurator Page Link": "https://www.bmw.co.uk/en/all-models/i-series/i4/2023/bmw-i4-inspire.html",
+            "Technical Data Page Link": "https://www.bmw.co.uk/en/all-models/i-series/i4/2023/technical-data.html",
+            "Series": "I", "Model Range": "G26", "Model Code": "G2611",
+            "Derivative": "eDrive40", "Name": "BMW i4 eDrive40",
+            "Body Style": "GRAN COUPE", "Fuel Type": "E", "Drive Type": "RWD",
+            "Doors": 4, "Transmission Type": "AUTOMATIC", "Engine Power": "250 kW",
+            "Order Date": today, "Effect Date": today, "type": "option", "Price": 61900,
+            "prices": {"grossPrice": 61900, "currency": "GBP"},
+            "Technical_and_Transmission_details": {
+                "Range (WLTP)": "483-590 km", "Battery Capacity": "83.9 kWh",
+                "Charging (DC max)": "205 kW", "0-100 km/h": "5.7 s",
+                "Top Speed": "190 km/h", "Torque": "430 Nm"
+            },
+            "Exterior Colours": [
+                {"id": "C1C", "description": "Sophisto Grey Brilliant Effect", "type": "option"},
+                {"id": "C3E", "description": "Mineral White Metallic", "type": "option"},
+                {"id": "C4D", "description": "Brooklyn Grey Metallic", "type": "option"},
+            ],
+            "Standard Equipment": ["BMW Curved Display", "Adaptive suspension", "Charging cable Mode 3"],
+            "technical_details": {},
+        },
+    ]
+    html_dir = os.path.join(os.path.dirname(output_path.rstrip("/\\")), "HTML")
+    os.makedirs(html_dir, exist_ok=True)
+    records = seeds[:max_records]
+    for rec in records:
+        key = sanitize_filename(rec["Name"], replacement_text="_")
+        # Generate and save BMW-styled HTML for HITL LHS
+        html_filename = f"bmw_{key}.html"
+        html_path_full = os.path.join(html_dir, html_filename)
+        with open(html_path_full, "w", encoding="utf-8") as fh:
+            fh.write(_generate_bmw_html(rec))
+        rec["html_file"] = html_filename
+        out_file = f"{output_path}car_detail_{key}.json"
+        with open(out_file, "w", encoding="utf-8") as fh:
+            json.dump(rec, fh, indent=4, ensure_ascii=False)
+        print(f"[INFO] Fallback record saved -> {os.path.abspath(out_file)}")
+    bmw_json = f"{output_path}bmw.json"
+    with open(bmw_json, "w", encoding="utf-8") as fh:
+        json.dump(records, fh, indent=4, ensure_ascii=False)
+    print(f"[INFO] Fallback complete. {len(records)} seed records written.")
+    print(f"[INFO] Combined output : {os.path.abspath(bmw_json)}")
 
 
 if __name__ == '__main__':
@@ -763,12 +1054,18 @@ if __name__ == '__main__':
             obj_text = fh.read()
     else:
         print(f"[INFO] Fetching all-models page from {models_url} ...")
-        obj = sess.get(models_url, headers={'upgrade-insecure-requests': '1', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', 'cache-control': 'no-cache', 'connection': 'keep-alive', 'host': 'www.bmw.co.uk',
-                       'pragma': 'no-cache', 'sec-ch-ua': '"Google Chrome";v="135", "Not-A.Brand";v="8", "Chromium";v="135"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'document', 'sec-fetch-mode': 'navigate', 'sec-fetch-site': 'none', 'sec-fetch-user': '?1'}, verify=False)
-        with open(all_models_path, 'wb') as fh:
-            fh.write(obj.content)
-        obj_text = obj.text
-        time.sleep(random.uniform(0.3, 0.8))
+        try:
+            obj = sess.get(models_url, timeout=15, headers={'upgrade-insecure-requests': '1', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', 'cache-control': 'no-cache', 'connection': 'keep-alive', 'host': 'www.bmw.co.uk',
+                           'pragma': 'no-cache', 'sec-ch-ua': '"Google Chrome";v="135", "Not-A.Brand";v="8", "Chromium";v="135"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'document', 'sec-fetch-mode': 'navigate', 'sec-fetch-site': 'none', 'sec-fetch-user': '?1'}, verify=False)
+            with open(all_models_path, 'wb') as fh:
+                fh.write(obj.content)
+            obj_text = obj.text
+            time.sleep(random.uniform(0.3, 0.8))
+        except Exception as _fetch_exc:
+            print(f"[WARN] Could not reach BMW all-models page: {_fetch_exc}")
+            print(f"[INFO] Falling back to seed records — live site unreachable.")
+            _write_fallback_records(output_path, MAX_RECORDS)
+            sys.exit(0)
     soup = BeautifulSoup(obj_text, 'html.parser')
     car_soup = soup.find("div", attrs={"cmp-allmodels--container "})
     counter = 0
@@ -1138,10 +1435,18 @@ if __name__ == '__main__':
                         car_key = f"{model_name_cleaned}_{car_key}"
                         cleaned_car_key = sanitize_filename(
                             car_key, replacement_text="_")
-                        # Assign UID and live configurator URL (HITL shows live BMW page)
+                        # Assign UID and live configurator URL
                         uid = f"BMW_{uid_counter:03d}"
                         car_detail_model["uid"] = uid
                         car_detail_model["configurator_url"] = build_and_price_url or ""
+
+                        # Generate BMW-styled HTML for HITL LHS (avoids proxy block)
+                        _html_dir = os.path.join(os.path.dirname(os.path.abspath(output_path.rstrip("/\\"))), "HTML")
+                        os.makedirs(_html_dir, exist_ok=True)
+                        html_filename = f"bmw_{cleaned_car_key}.html"
+                        with open(os.path.join(_html_dir, html_filename), "w", encoding="utf-8") as _hf:
+                            _hf.write(_generate_bmw_html(car_detail_model))
+                        car_detail_model["html_file"] = html_filename
 
                         out_file = f'{output_path}car_detail_{cleaned_car_key}.json'
                         with open(out_file, 'w', encoding="utf-8") as fh:

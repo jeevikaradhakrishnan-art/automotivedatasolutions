@@ -233,7 +233,7 @@ export const CAPABILITIES: CapabilityCase[] = [
     ],
   },
   {
-    id: "components-market-research",
+    id: "bike-trends",
     title: "Bicycle Industry Trend & Sentiment Monitoring",
     customerProfile: "Global cycling components manufacturer · UK strategy team",
     industryTag: "Cycling Components · Consumer Insights",

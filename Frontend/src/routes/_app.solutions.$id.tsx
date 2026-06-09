@@ -49,7 +49,7 @@ function SolutionDetail() {
   const [tab, setTab] = useState<Tab>(tabParam ?? "sources");
   const [openInsight, setOpenInsight] = useState<NewsInsight | null>(null);
   const [openJobId, setOpenJobId] = useState<string | null>(null);
-  const [jobFilter, setJobFilter] = useState<"all" | "success" | "review" | "failed">("all");
+  const [jobFilter, setJobFilter] = useState<"all" | "success">("success");
 
   const subscribed = usePlatform((s) => s.subscriptions.includes(solution?.id ?? "vehicle-spec"));
   const toggleSub = usePlatform((s) => s.toggleSubscription);
@@ -385,8 +385,8 @@ function SolutionDetail() {
         <div className="space-y-3">
           {/* Filter tabs */}
           <div className="flex gap-1 p-0.5 rounded-lg border border-border bg-card shadow-sm w-fit flex-wrap">
-            {(["all", "success", "review", "failed"] as const).map((f) => {
-              const labels = { all: "All", success: "Completed", review: "Pending Review", failed: "Failed" };
+            {(["all", "success"] as const).map((f) => {
+              const labels = { all: "All", success: "Completed" };
               const count = f === "all" ? jobs.length : jobs.filter((j) => j.status === f).length;
               return (
                 <button

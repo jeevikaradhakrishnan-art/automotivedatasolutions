@@ -33,6 +33,14 @@ function fmtRuntime(j: Job) {
   return "—";
 }
 
+const STATUS_PRIORITY: Record<Job["status"], number> = {
+  success: 0,
+  review:  1,
+  failed:  2,
+  running: 3,
+  queued:  4,
+};
+
 export function JobsTable({
   jobs,
   onDownload,
@@ -46,6 +54,7 @@ export function JobsTable({
   onSelect?: (j: Job) => void;
   showSolution?: boolean;
 }) {
+  const sorted = [...jobs].sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]);
   if (jobs.length === 0) {
     return (
       <div className="border border-dashed border-border rounded-md py-10 text-center text-xs text-muted-foreground">
@@ -70,7 +79,7 @@ export function JobsTable({
           </tr>
         </thead>
         <tbody>
-          {jobs.map((j) => {
+          {sorted.map((j) => {
             const sol = SOLUTIONS.find((s) => s.id === j.solutionId);
             const reviewLabel = j.reviewTotal
               ? `${j.reviewApproved ?? 0}/${j.reviewTotal}${j.reviewRejected ? ` · ${j.reviewRejected} rej` : ""}`

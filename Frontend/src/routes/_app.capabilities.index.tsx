@@ -19,7 +19,7 @@ function CapabilitiesLanding() {
   return (
     <div className="p-5 space-y-5">
       <div>
-        <div className="text-[10px] font-mono tracking-widest text-muted-foreground">XDAS · USE-CASES</div>
+        <div className="text-[10px] font-mono tracking-widest text-muted-foreground">AUTOMOTIVE INTELLIGENCE · USE-CASES</div>
         <h1 className="text-2xl font-semibold tracking-tight mt-1 flex items-center gap-2">
           <Sparkles className="size-5 text-primary" /> What we've delivered for customers
         </h1>

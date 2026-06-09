@@ -1,10 +1,12 @@
 @echo off
 title Automotive Data Solutions Launcher
 
-echo Starting Backend...
-start "Backend - FastAPI" cmd /k "cd /d "%~dp0Backend" && uvicorn main:app --host 0.0.0.0 --reload"
+echo [1/2] Starting Backend (FastAPI on port 8000)...
+start "XDAS Backend" cmd /k "cd /d "%~dp0Backend" && uvicorn main:app --host 0.0.0.0 --port 8000"
 
-echo Starting Frontend...
-start "Frontend - Vite" cmd /k "cd /d "%~dp0Frontend" && npm run dev"
+echo [2/2] Starting Frontend (Vite preview on port 8080)...
+start "XDAS Frontend" cmd /k "cd /d "%~dp0Frontend" && npm run start"
 
+echo.
+echo Services launched. Access at http://%COMPUTERNAME%:8080
 exit

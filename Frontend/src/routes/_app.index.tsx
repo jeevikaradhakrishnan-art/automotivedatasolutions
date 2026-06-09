@@ -21,7 +21,7 @@ function SolutionsLanding() {
   return (
     <div className="p-5 space-y-5">
       <div>
-        <div className="text-[10px] font-mono tracking-widest text-muted-foreground">XDAS · MOBILITY INTELLIGENCE HUB</div>
+        <div className="text-[10px] font-mono tracking-widest text-muted-foreground">XDAS · AUTOMOTIVE INTELLIGENCE HUB</div>
         <h1 className="text-2xl font-semibold tracking-tight mt-1">Automotive Data Solutions</h1>
         <p className="text-sm text-muted-foreground max-w-2xl mt-1">
           Activate a use case, configure its workflows, run jobs against trusted sources and ship

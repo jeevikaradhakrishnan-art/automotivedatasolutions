@@ -109,6 +109,7 @@ function SolutionDetail() {
       };
       addJob(job);
       setTab("jobs");
+      setJobFilter("all");
 
       try {
         const useCached = false;
@@ -200,6 +201,7 @@ function SolutionDetail() {
     };
     addJob(job);
     setTab("jobs");
+    setJobFilter("all");
     const startMs = Date.now();
     setTimeout(() => {
       const rows = Math.floor(120 + Math.random() * 3800);

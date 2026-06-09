@@ -49,7 +49,7 @@ function SolutionDetail() {
   const [tab, setTab] = useState<Tab>(tabParam ?? "sources");
   const [openInsight, setOpenInsight] = useState<NewsInsight | null>(null);
   const [openJobId, setOpenJobId] = useState<string | null>(null);
-  const [jobFilter, setJobFilter] = useState<"all" | "success">("success");
+  const [jobFilter, setJobFilter] = useState<"all" | "success">("all");
 
   const subscribed = usePlatform((s) => s.subscriptions.includes(solution?.id ?? "vehicle-spec"));
   const toggleSub = usePlatform((s) => s.toggleSubscription);
@@ -108,7 +108,9 @@ function SolutionDetail() {
         botId,
       };
       addJob(job);
+      setJobFilter("all");
       setTab("jobs");
+      setOpenJobId(localJobId);
 
       try {
         const useCached = false;
@@ -151,24 +153,27 @@ function SolutionDetail() {
               // Load real HITL items from backend
               (backendJob.hitlItems ?? []).forEach((h: Record<string, unknown>) => {
                 addHitl({
-                  id:          h.id as string,
-                  solutionId:  solution.id,
-                  jobId:       localJobId,
+                  id:             h.id as string,
+                  solutionId:     solution.id,
+                  jobId:          localJobId,
                   uid:            h.uid as string | undefined,
                   htmlFile:       h.htmlFile as string | undefined,
                   screenshotFile: h.screenshotFile as string | undefined,
                   liveUrl:        h.liveUrl as string | undefined,
-                  recordName:  h.recordName as string | undefined,
-                  summary:     h.summary as string,
-                  detail:      h.detail as string,
-                  fields:      h.fields as HitlItem["fields"],
-                  confidence:  h.confidence as number,
-                  status:      "pending",
-                  createdAt:   h.createdAt as string,
-                  previewKind: "html",
-                  workflow:    workflow?.name,
+                  recordName:     h.recordName as string | undefined,
+                  summary:        h.summary as string,
+                  detail:         h.detail as string,
+                  fields:         h.fields as HitlItem["fields"],
+                  confidence:     h.confidence as number,
+                  status:         "pending",
+                  createdAt:      h.createdAt as string,
+                  previewKind:    (h.previewKind as "html" | "pdf" | "screenshot") ?? "html",
+                  workflow:       workflow?.name,
                 });
               });
+              // Auto-navigate: close log panel, switch to review tab when records arrived
+              setOpenJobId(null);
+              if (frontendStatus === "review") setTab("review");
             }
           } catch { /* ignore transient errors */ }
         }, 3000);
@@ -199,7 +204,9 @@ function SolutionDetail() {
       })),
     };
     addJob(job);
+    setJobFilter("all");
     setTab("jobs");
+    setOpenJobId(job.id);
     const startMs = Date.now();
     setTimeout(() => {
       const rows = Math.floor(120 + Math.random() * 3800);
@@ -235,6 +242,8 @@ function SolutionDetail() {
           previewKind: solution.id === "plants" || solution.id === "dealer-inventory" ? "pdf" : "html",
         });
       });
+      setOpenJobId(null);
+      setTab("review");
     }, 1600 + Math.random() * 1400);
   };
 

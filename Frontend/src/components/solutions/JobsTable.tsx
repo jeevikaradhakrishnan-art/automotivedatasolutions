@@ -34,10 +34,10 @@ function fmtRuntime(j: Job) {
 }
 
 const STATUS_PRIORITY: Record<Job["status"], number> = {
-  success: 0,
-  review:  1,
-  failed:  2,
-  running: 3,
+  running: 0,
+  success: 1,
+  review:  2,
+  failed:  3,
   queued:  4,
 };
 

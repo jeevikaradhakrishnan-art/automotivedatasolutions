@@ -32,7 +32,7 @@ const generateId = (): string => {
 
 type Tab = "sources" | "workflows" | "jobs" | "review" | "data" | "integrations" | "insights";
 
-const JOB_STATUS_ORDER: Record<string, number> = { running: 0, success: 1, review: 2, failed: 3, queued: 4 };
+const JOB_STATUS_ORDER: Record<string, number> = { running: 0, review: 1, success: 2, failed: 3, queued: 4 };
 
 export const Route = createFileRoute("/_app/solutions/$id")({
   validateSearch: (search: Record<string, unknown>) => ({

@@ -1,4 +1,4 @@
-import { Download, Lock, X } from "lucide-react";
+import { Download, Lock } from "lucide-react";
 import type { Job } from "@/store/platform";
 import { SOLUTIONS } from "@/data/solutions";
 
@@ -102,14 +102,7 @@ export function JobsTable({
                   </span>
                 </td>
                 <td className="px-3 py-2 text-right">
-                  {j.status === "running" && onAbort && j.botJobId ? (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onAbort(j); }}
-                      className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[11px] font-mono border border-danger/40 text-danger hover:bg-danger/10 transition"
-                    >
-                      <X className="size-3" /> ABORT
-                    </button>
-                  ) : j.status === "success" && (j.reviewTotal === 0 || (j.reviewApproved ?? 0) > 0) ? (
+                  {j.status === "success" && (j.reviewTotal === 0 || (j.reviewApproved ?? 0) > 0) ? (
                     <button
                       onClick={(e) => { e.stopPropagation(); onDownload(j); }}
                       className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[11px] font-mono border border-border hover:border-cyan/30 hover:text-cyan transition"

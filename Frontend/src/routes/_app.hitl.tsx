@@ -511,8 +511,17 @@ function ValidationScreen({
               setCtxMenu({ x: e.clientX, y: e.clientY, text, editable: !text });
             }}
           >
-            <div style={{ zoom: (item.liveUrl || item.htmlFile || item.screenshotFile) ? undefined : `${zoom}%` }} className="transition-all">
-              {(item.htmlFile && !item.htmlFile.startsWith("http")) && view === "html" ? (
+            <div style={{ zoom: (isTeslaItem(item) || item.liveUrl || item.htmlFile || item.screenshotFile) ? undefined : `${zoom}%` }} className="transition-all">
+              {isTeslaItem(item) && view === "html" ? (
+                // Tesla always renders the local configurator replica — never proxy or screenshot
+                <BotHtmlViewer
+                  key={item.id}
+                  item={item}
+                  allFields={allFields}
+                  selectedField={selectedField}
+                  onIframe={setBotIframeEl}
+                />
+              ) : (item.htmlFile && !item.htmlFile.startsWith("http")) && view === "html" ? (
                 <BotHtmlViewer
                   key={item.id}
                   item={item}
@@ -1115,110 +1124,91 @@ function buildFieldsFallbackHtml(item: HitlItem): string {
 }
 
 // ── Rich Tesla configurator replica built from extracted fields ───────────────
+// Renders EVERY field/group present in item.fields so the LHS always mirrors the RHS.
 function buildTeslaConfiguratorHtml(item: HitlItem): string {
+  const allFields = item.fields ?? [];
   const fm: Record<string, string> = {};
-  (item.fields ?? []).forEach((fi) => { if (fi.value) fm[fi.name] = fi.value; });
+  allFields.forEach((fi) => { if (fi.value) fm[fi.name] = fi.value; });
 
-  const model      = fm["Model"] || fm["model"] || item.recordName?.replace(/Tesla\s*/i, "").split("—")[0].trim() || "Model";
-  const region     = fm["Region"] || fm["Country"] || fm["country"] || "";
-  const basePrice  = fm["Base price"] || fm["Cash price"] || "";
-  const currency   = fm["Currency"] || "";
-  const rangeVal   = fm["Range"] || fm["Range (converted)"] || "";
-  const accel      = fm["Acceleration"] || fm["0-60 mph"] || "";
-  const topSpeed   = fm["Top Speed"] || "";
-  const seating    = fm["Seating"] || "";
-  const cargo      = fm["Cargo"] || "";
-  const drivetrain = fm["Drivetrain"] || "";
-  const peakPower  = fm["Peak Power"] || "";
-  const colorOpts  = fm["Color options"] || "";
-  const wheelOpts  = fm["Wheel options"] || "";
-  const interiorOpts = fm["Interior options"] || "";
-  const autopilot  = fm["Autopilot"] || "";
-  const chargeTime = fm["Charge time"] || "";
-  const towing     = fm["Towing"] || "";
-  const payload    = fm["Payload"] || "";
-  const trimVariants = fm["Trim variants"] || "";
-  const priceDate  = fm["Price date"] || "";
-  const uid        = fm["UID"] || "";
+  // Group fields preserving order of first appearance
+  const byGroup: Record<string, HitlField[]> = {};
+  const groupOrder: string[] = [];
+  allFields.forEach((fi) => {
+    if (!fi.value) return;
+    const g = fi.group ?? "other";
+    if (!byGroup[g]) { byGroup[g] = []; groupOrder.push(g); }
+    byGroup[g].push(fi);
+  });
 
-  const allFields     = item.fields ?? [];
-  const trimFields    = allFields.filter((f) => f.group === "trims");
-  const leaseFields   = allFields.filter((f) => f.group === "lease");
-  const financeFields = allFields.filter((f) => f.group === "finance");
-
+  // Hero values
+  const model     = fm["Model"] || fm["model"] || item.recordName?.replace(/Tesla\s*/i, "").split("—")[0].trim() || "Model";
+  const region    = fm["Region"] || fm["Country"] || fm["country"] || "";
+  const basePrice = fm["Base price"] || fm["Cash price"] || "";
+  const currency  = fm["Currency"] || "";
+  const rangeVal  = fm["Range"] || fm["Range (converted)"] || "";
+  const accel     = fm["Acceleration"] || fm["0-60 mph"] || "";
+  const topSpeed  = fm["Top Speed"] || "";
+  const priceField = fm["Base price"] ? "Base price" : "Cash price";
   const accelField = fm["Acceleration"] ? "Acceleration" : "0-60 mph";
-  const priceField = fm["Base price"]   ? "Base price"   : "Cash price";
 
+  // Performance tiles (only when values exist)
   const perfTiles = [
-    rangeVal  ? `<div class="perf-tile"><div class="perf-val" data-hitl="Range">${rangeVal}</div><div class="perf-lbl">Range</div></div>` : "",
-    accel     ? `<div class="perf-tile"><div class="perf-val" data-hitl="${accelField}">${accel}<span class="perf-unit"> s</span></div><div class="perf-lbl">0&#x2013;60 mph</div></div>` : "",
-    topSpeed  ? `<div class="perf-tile"><div class="perf-val" data-hitl="Top Speed">${topSpeed}</div><div class="perf-lbl">Top Speed</div></div>` : "",
+    rangeVal ? `<div class="perf-tile"><div class="perf-val" data-hitl="Range">${rangeVal}</div><div class="perf-lbl">Range</div></div>` : "",
+    accel    ? `<div class="perf-tile"><div class="perf-val" data-hitl="${accelField}">${accel}<span class="perf-unit"> s</span></div><div class="perf-lbl">0&#x2013;60 mph</div></div>` : "",
+    topSpeed ? `<div class="perf-tile"><div class="perf-val" data-hitl="Top Speed">${topSpeed}</div><div class="perf-lbl">Top Speed</div></div>` : "",
   ].filter(Boolean).join("");
 
-  const specRows = ([
-    ["Drivetrain",    drivetrain,  "Drivetrain"],
-    ["Peak Power",    peakPower,   "Peak Power"],
-    ["Seating",       seating,     "Seating"],
-    ["Cargo",         cargo,       "Cargo"],
-    ["Towing",        towing,      "Towing"],
-    ["Payload",       payload,     "Payload"],
-    ["Charge time",   chargeTime,  "Charge time"],
-    ["Trim variants", trimVariants,"Trim variants"],
-  ] as [string, string, string][])
-    .filter(([, v]) => v)
-    .map(([label, val, field]) => `<tr><td class="sl">${label}</td><td class="sv" data-hitl="${field}">${val}</td></tr>`)
-    .join("");
+  // Group → section label map
+  const groupLabel: Record<string, string> = {
+    vehicle:  "Vehicle",
+    specs:    "Specifications",
+    options:  "Options",
+    trims:    "Available Trims",
+    pricing:  "Pricing",
+    lease:    "Lease",
+    finance:  "Finance",
+    features: "Features",
+    location: "Location",
+    meta:     "Record Information",
+  };
 
-  const trimsHtml = trimFields.length ? `
-    <div class="section">
-      <div class="sh">Available Trims</div>
-      <div class="trims-grid">
-        ${trimFields.map((t) => `
-          <div class="trim-card">
-            <div class="trim-name" data-hitl="${t.name}">${t.name}</div>
-            <div class="trim-detail">${t.value ?? ""}</div>
-          </div>`).join("")}
-      </div>
-    </div>` : "";
+  // Preferred display order — any groups not listed are appended after
+  const preferredOrder = ["vehicle","specs","options","trims","pricing","lease","finance","features","location","meta"];
+  const sortedGroups = [
+    ...preferredOrder.filter((g) => byGroup[g]),
+    ...groupOrder.filter((g) => !preferredOrder.includes(g) && byGroup[g]),
+  ];
 
-  const optRows = [
-    colorOpts    ? `<tr><td class="sl">Exterior Colors</td><td class="sv" data-hitl="Color options">${colorOpts}</td></tr>` : "",
-    wheelOpts    ? `<tr><td class="sl">Wheels</td><td class="sv" data-hitl="Wheel options">${wheelOpts}</td></tr>` : "",
-    interiorOpts ? `<tr><td class="sl">Interior</td><td class="sv" data-hitl="Interior options">${interiorOpts}</td></tr>` : "",
-  ].filter(Boolean).join("");
-  const optionsHtml = optRows ? `
-    <div class="section">
-      <div class="sh">Options</div>
-      <table class="st"><tbody>${optRows}</tbody></table>
-    </div>` : "";
+  // Fields already rendered in hero/perf tiles — skip rendering them again in table rows
+  const heroFields = new Set(["Model","model","Region","Country","country","Base price","Cash price","Currency","Range","Range (converted)","Acceleration","0-60 mph","Top Speed","trim","Brand"]);
 
-  const leaseRows   = leaseFields.map((f) => `<tr><td class="sl">${f.name}</td><td class="sv" data-hitl="${f.name}">${f.value ?? ""}</td></tr>`).join("");
-  const financeRows = financeFields.map((f) => `<tr><td class="sl">${f.name}</td><td class="sv" data-hitl="${f.name}">${f.value ?? ""}</td></tr>`).join("");
-  const pricingRows = [
-    basePrice  ? `<tr><td class="sl">${priceField === "Base price" ? "Base Price" : "Cash Price"}</td><td class="sv pv" data-hitl="${priceField}">${currency ? `<span data-hitl="Currency">${currency}</span> ` : ""}${basePrice}</td></tr>` : "",
-    leaseRows,
-    financeRows,
-    priceDate  ? `<tr><td class="sl">Price Date</td><td class="sv" data-hitl="Price date">${priceDate}</td></tr>` : "",
-  ].filter(Boolean).join("");
-  const pricingHtml = pricingRows ? `
-    <div class="section">
-      <div class="sh">Pricing</div>
-      <table class="st"><tbody>${pricingRows}</tbody></table>
-    </div>` : "";
-
-  const featuresRows = [
-    autopilot  ? `<tr><td class="sl">Autopilot</td><td class="sv" data-hitl="Autopilot">${autopilot}</td></tr>` : "",
-  ].filter(Boolean).join("");
-  const featuresHtml = featuresRows ? `
-    <div class="section">
-      <div class="sh">Features</div>
-      <table class="st"><tbody>${featuresRows}</tbody></table>
-    </div>` : "";
-
-  const hiddenFields = allFields
-    .filter((f) => f.value)
-    .map((f) => `<span data-hitl="${f.name}" style="display:none">${f.value}</span>`)
-    .join("");
+  const sectionsHtml = sortedGroups.map((g) => {
+    const fields = byGroup[g];
+    if (g === "trims") {
+      return `
+        <div class="section">
+          <div class="sh">${groupLabel[g] || g}</div>
+          <div class="trims-grid">
+            ${fields.map((f) => `
+              <div class="trim-card">
+                <div class="trim-name" data-hitl="${f.name}">${f.name}</div>
+                <div class="trim-detail">${f.value ?? ""}</div>
+              </div>`).join("")}
+          </div>
+        </div>`;
+    }
+    const rows = fields
+      .map((f) => `<tr>
+        <td class="sl">${f.name}</td>
+        <td class="sv${g === "pricing" || g === "lease" || g === "finance" ? " pv" : ""}" data-hitl="${f.name}">${f.value ?? ""}</td>
+      </tr>`)
+      .join("");
+    return `
+      <div class="section">
+        <div class="sh">${groupLabel[g] || g}</div>
+        <table class="st"><tbody>${rows}</tbody></table>
+      </div>`;
+  }).join("");
 
   const liveLinkHtml = item.liveUrl
     ? `<div style="text-align:center;padding:24px 0"><a href="${item.liveUrl}" target="_blank" rel="noopener" style="color:#e31937;font-size:11px;letter-spacing:3px;text-decoration:none">VIEW ON TESLA.COM &#x2197;</a></div>`
@@ -1229,7 +1219,7 @@ function buildTeslaConfiguratorHtml(item: HitlItem): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Tesla ${model}${region ? " — " + region : ""} · Configurator</title>
+<title>Tesla ${model}${region ? " — " + region : ""} &middot; Configurator</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;background:#171a20;color:#fff;min-height:100vh}
@@ -1240,10 +1230,10 @@ a{color:#e31937;text-decoration:none}
 .hero{background:linear-gradient(160deg,#0a0a0a 0%,#111318 50%,#0e1018 100%);padding:48px 24px 32px;text-align:center;position:relative;overflow:hidden}
 .hero::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 25%,rgba(227,25,55,.07),transparent 60%)}
 .hero-ey{font-size:10px;letter-spacing:4px;color:#888;text-transform:uppercase;margin-bottom:10px}
-.hero-model{font-size:54px;font-weight:200;letter-spacing:-1px;line-height:1;position:relative}
+.hero-model{font-size:54px;font-weight:200;letter-spacing:-1px;line-height:1}
 .hero-sub{font-size:13px;color:#888;margin-top:6px}
 .hero-price{font-size:20px;font-weight:500;margin-top:12px}
-.hero-price .hp-val{color:#e31937}
+.hp-val{color:#e31937}
 .order-btn{display:inline-block;margin-top:20px;background:#e31937;color:#fff;font-size:13px;font-weight:600;padding:12px 40px;border-radius:4px;letter-spacing:1px;cursor:pointer}
 .car-svg{display:block;margin:24px auto 0;width:68%;opacity:.18}
 .ps{display:flex;justify-content:center;background:#1b1f27;border-top:1px solid #2a2d35;border-bottom:1px solid #2a2d35}
@@ -1256,13 +1246,13 @@ a{color:#e31937;text-decoration:none}
 .section{margin-top:32px}
 .sh{font-size:10px;letter-spacing:4px;text-transform:uppercase;color:#e31937;padding-bottom:8px;border-bottom:1px solid #2a2d35;margin-bottom:12px}
 .st{width:100%;border-collapse:collapse}
-.sl{padding:9px 0;font-size:13px;color:#777;width:48%;border-bottom:1px solid #1e2028}
-.sv{padding:9px 0;font-size:13px;font-weight:500;border-bottom:1px solid #1e2028;text-align:right}
-.pv{font-size:17px}
+.sl{padding:9px 0;font-size:13px;color:#777;width:48%;border-bottom:1px solid #1e2028;vertical-align:top}
+.sv{padding:9px 0;font-size:13px;font-weight:500;border-bottom:1px solid #1e2028;text-align:right;word-break:break-word}
+.pv{font-size:16px}
 .trims-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
 .trim-card{background:#1f2229;border:1px solid #2a2d35;border-radius:6px;padding:14px 16px}
-.trim-name{font-size:14px;font-weight:600;margin-bottom:4px}
-.trim-detail{font-size:11px;color:#777;line-height:1.6}
+.trim-name{font-size:14px;font-weight:600;margin-bottom:6px}
+.trim-detail{font-size:12px;color:#aaa;line-height:1.7}
 .footer{text-align:center;padding:32px 24px;border-top:1px solid #1e2028;color:#3a3d45;font-size:10px;margin-top:32px}
 </style>
 </head>
@@ -1287,17 +1277,12 @@ a{color:#e31937;text-decoration:none}
 </div>
 ${perfTiles ? `<div class="ps">${perfTiles}</div>` : ""}
 <div class="content">
-  ${specRows ? `<div class="section"><div class="sh">Specifications</div><table class="st"><tbody>${specRows}</tbody></table></div>` : ""}
-  ${optionsHtml}
-  ${trimsHtml}
-  ${pricingHtml}
-  ${featuresHtml}
+  ${sectionsHtml}
   ${liveLinkHtml}
 </div>
 <div class="footer">
-  &copy; ${new Date().getFullYear()} Tesla, Inc. &nbsp;&middot;&nbsp; Data captured for HITL review &nbsp;&middot;&nbsp; <span data-hitl="UID">${uid}</span>
+  &copy; ${new Date().getFullYear()} Tesla, Inc. &nbsp;&middot;&nbsp; HITL review data &nbsp;&middot;&nbsp; UID: <span data-hitl="UID">${fm["UID"] || item.uid || ""}</span>
 </div>
-<div style="display:none">${hiddenFields}</div>
 </body>
 </html>`;
 }
@@ -1323,8 +1308,8 @@ function BotHtmlViewer({
     setLoaded(false);
     setSrcdoc("");
     const isLocal = item.htmlFile && !item.htmlFile.startsWith("http");
-    // Tesla items: build rich configurator replica locally — never proxy live Tesla URLs
-    if (!isLocal && isTeslaItem(item)) {
+    // Tesla items: always build configurator replica from extracted fields — ignore any htmlFile/screenshotFile/liveUrl
+    if (isTeslaItem(item)) {
       setSrcdoc(injectAnnotationLayer(buildTeslaConfiguratorHtml(item)));
       return;
     }

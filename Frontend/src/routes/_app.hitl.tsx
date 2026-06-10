@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 const BOT_API = typeof window !== "undefined"
-  ? `http://${window.location.hostname}:8001`
+  ? ""
   : "http://localhost:8001";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {

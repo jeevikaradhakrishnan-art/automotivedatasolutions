@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 
-// Derive backend base URL from the current hostname so LAN / remote access works
+// Use relative URL so browser calls stay on the same HTTPS origin (IIS proxies /api/* to backend)
 const BOT_API = typeof window !== "undefined"
-  ? `http://${window.location.hostname}:8001`
+  ? ""
   : "http://localhost:8001";
 import { useMemo, useState, useEffect, useRef } from "react";
 import {

@@ -236,7 +236,7 @@ function SolutionDetail() {
             confidence: Math.max(55, 100 - Math.floor(Math.random() * 35)),
           })),
           confidence: 75 - i * 3, status: "pending", createdAt: new Date().toISOString(),
-          previewKind: solution.id === "plants" || solution.id === "dealer-inventory" ? "pdf" : "html",
+          previewKind: solution.id === "plants" ? "pdf" : "html",
         });
       });
     }, 1600 + Math.random() * 1400);

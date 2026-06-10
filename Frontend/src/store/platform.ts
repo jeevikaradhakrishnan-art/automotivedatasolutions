@@ -547,7 +547,24 @@ export const usePlatform = create<PlatformState>()(
       addJob: (j) => set((s) => ({ jobs: [j, ...s.jobs] })),
       updateJob: (id, patch) =>
         set((s) => ({ jobs: s.jobs.map((j) => (j.id === id ? { ...j, ...patch } : j)) })),
-      addHitl: (h) => set((s) => ({ hitl: [h, ...s.hitl] })),
+      addHitl: (h) => set((s) => {
+        let fields = h.fields;
+        if (fields && fields.length >= 4) {
+          const mutable = [...fields];
+          // Demo: clear 1-2 lowest-confidence non-primary fields so they require manual annotation
+          const candidates = mutable
+            .slice(2) // preserve the first 2 (primary identifiers)
+            .map((f, i) => ({ idx: i + 2, conf: f.confidence }))
+            .filter(({ idx }) => !!mutable[idx].value)
+            .sort((a, b) => a.conf - b.conf);
+          const n = Math.min(2, Math.max(1, Math.ceil(candidates.length / 3)));
+          candidates.slice(0, n).forEach(({ idx }) => {
+            mutable[idx] = { ...mutable[idx], value: "" };
+          });
+          fields = mutable;
+        }
+        return { hitl: [{ ...h, fields }, ...s.hitl] };
+      }),
       resolveHitl: (id, status) => {
         set((s) => ({ hitl: s.hitl.map((h) => (h.id === id ? { ...h, status, reviewer: "E. Mercer" } : h)) }));
         // Update job counters
@@ -594,7 +611,7 @@ export const usePlatform = create<PlatformState>()(
       },
     }),
     {
-      name: "xdas-platform-v12",
+      name: "xdas-platform-v13",
       storage: createJSONStorage(() =>
         typeof window !== "undefined"
           ? window.localStorage

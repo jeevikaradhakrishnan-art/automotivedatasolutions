@@ -1414,6 +1414,7 @@ function VehicleBrandPage({ f, item }: { f: Record<string, string>; item: HitlIt
         </table>
         <div className="h-8" />
         <div className="text-[10px] text-neutral-400 border-t pt-3">© {new Date().getFullYear()} {oem} of North America, LLC. Specifications are estimates and subject to change.</div>
+        <FieldsReference item={item} />
       </div>
     </div>
   );
@@ -1463,6 +1464,7 @@ function NewsArticlePage({ f, item }: { f: Record<string, string>; item: HitlIte
           ))}
         </div>
         <div className="text-[10px] text-neutral-400 pt-3 border-t">© {new Date().getFullYear()} Thomson Reuters. All rights reserved.</div>
+        <FieldsReference item={item} />
       </div>
     </div>
   );
@@ -1484,6 +1486,7 @@ function EvStationPage({ f, item }: { f: Record<string, string>; item: HitlItem 
         </div>
         <div className="text-[12px] pt-3 leading-relaxed">{item.detail}</div>
         <div className="text-[10px] text-neutral-400 pt-4 border-t">© ChargePoint Inc.</div>
+        <FieldsReference item={item} />
       </div>
     </div>
   );
@@ -1503,6 +1506,7 @@ function DealerPage({ f, item }: { f: Record<string, string>; item: HitlItem }) 
             <div key={k} className="flex justify-between border-b border-dashed py-1.5"><span className="text-neutral-500">{k}</span><span data-field={fn} className="font-medium">{v || "—"}</span></div>
           ))}
         </div>
+        <FieldsReference item={item} />
       </div>
     </div>
   );
@@ -1521,6 +1525,7 @@ function GenericSitePage({ f, item }: { f: Record<string, string>; item: HitlIte
           ))}
         </tbody>
       </table>
+      <FieldsReference item={item} />
     </div>
   );
 }
@@ -1632,6 +1637,7 @@ function OemConfiguratorPage({ f, item }: { f: Record<string, string>; item: Hit
         <div className="text-[10px] text-neutral-400 border-t pt-3">
           © {new Date().getFullYear()} {oem}. Configurator data captured for <span className="font-mono">{item.recordName}</span> · scraped from public build-and-price journey.
         </div>
+        <FieldsReference item={item} />
       </div>
     </div>
   );
@@ -1756,6 +1762,7 @@ function VehicleSpecSheetPdf({ f, item }: { f: Record<string, string>; item: Hit
           <span>© {new Date().getFullYear()} {oem}. Specifications subject to change without notice. EPA estimates pending final certification.</span>
           <span className="font-mono">Page 1 / 2</span>
         </div>
+        <FieldsReference item={item} />
       </div>
     </div>
   );
@@ -1810,6 +1817,7 @@ function PlantDataSheetPdf({ f, item }: { f: Record<string, string>; item: HitlI
         <span>Sourced from corporate site & registry feeds. Subject to verification.</span>
         <span>Page 1 of 1</span>
       </div>
+      <FieldsReference item={item} />
     </div>
   );
 }
@@ -1822,6 +1830,28 @@ function PdfRow({ k, v, field }: { k: string; v: string; field?: string }) {
     <div className="flex justify-between py-1 border-b border-dashed border-neutral-200">
       <span className="text-neutral-500">{k}</span>
       <span data-field={field} className="font-medium text-right ml-3 truncate" title={v}>{v}</span>
+    </div>
+  );
+}
+
+/* Universal fallback reference — renders every field from item.fields with its exact data-field
+   so clicking ANY RHS attribute always locates its value in LHS, even for bot-extracted fields
+   whose names don't match the styled template above. querySelector finds styled elements first
+   (they appear earlier in the DOM), so this only acts as fallback for unknown field names. */
+function FieldsReference({ item }: { item: HitlItem }) {
+  const fields = item.fields ?? [];
+  if (!fields.length) return null;
+  return (
+    <div className="mt-4 pt-3 border-t border-neutral-100">
+      <div className="text-[8px] tracking-[0.25em] text-neutral-300 font-bold mb-1.5 uppercase">Extracted fields reference</div>
+      <div className="grid grid-cols-2 gap-x-4">
+        {fields.map((f) => (
+          <div key={f.name} className="flex justify-between text-[10px] py-0.5 border-b border-dashed border-neutral-100">
+            <span className="text-neutral-300 font-mono truncate mr-2">{f.name}</span>
+            <span data-field={f.name} className="text-neutral-500 font-mono text-right truncate max-w-[140px]" title={f.value || "—"}>{f.value || "—"}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

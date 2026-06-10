@@ -2,8 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 
 // Derive backend base URL from the current hostname so LAN / remote access works
 const BOT_API = typeof window !== "undefined"
-  ? `http://${window.location.hostname}:8000`
-  : "http://localhost:8000";
+  ? `http://${window.location.hostname}:8001`
+  : "http://localhost:8001";
 import { useMemo, useState, useEffect, useRef } from "react";
 import {
   ArrowLeft, Check, Plus, FileDown, Sparkles, Database, Workflow, Inbox,

@@ -7,7 +7,7 @@ import { useMemo, useState, useEffect, useRef, useCallback, memo } from "react";
 import {
   Check, X, ClipboardCheck, Filter, FileText, Globe, Camera,
   ChevronLeft, ChevronRight, Info, Search, SkipForward, ArrowRight, Layers, Lock,
-  ZoomIn, ZoomOut, Languages, Plus, MessageSquare, Sparkles, Keyboard, History,
+  ZoomIn, ZoomOut, Languages, Plus, MessageSquare, Sparkles, Keyboard,
   Activity, Gauge, ChevronDown, MapPin, Save, Circle, MousePointerClick,
 } from "lucide-react";
 import { usePlatform, type HitlItem, type HitlStatus, type Job } from "@/store/platform";
@@ -90,12 +90,10 @@ function HitlPage() {
         }}
         onComplete={() => {
           completeReview(openBatch.job.id);
-          // Notify backend
           const backendJobId = openBatch.job.botJobId;
           if (backendJobId) {
             fetch(`${BOT_API}/api/jobs/${backendJobId}/submit-review`, { method: "POST" }).catch(() => {});
           }
-          setOpenJobId(null);
         }}
         onFeedback={(rating, message) =>
           addFeedback({ id: crypto.randomUUID(), solutionId: openBatch.job.solutionId, workflow: openBatch.job.workflow, jobId: openBatch.job.id, rating, message, createdAt: new Date().toISOString() })
@@ -123,9 +121,9 @@ function HitlPage() {
           </p>
         </div>
         <div className="flex gap-2 text-[11px] font-mono">
-          <Stat label="PENDING"  value={pendingTotal} tone="amber" />
-          <Stat label="APPROVED" value={approvedTotal} tone="success" />
-          <Stat label="REJECTED" value={rejectedTotal} tone="danger" />
+          <Stat label="PENDING RECORDS"  value={pendingTotal} tone="amber" />
+          <Stat label="APPROVED RECORDS" value={approvedTotal} tone="success" />
+          <Stat label="REJECTED RECORDS" value={rejectedTotal} tone="danger" />
         </div>
       </div>
 
@@ -279,7 +277,6 @@ function ValidationScreen({
   const [openComment, setOpenComment] = useState<string | null>(null);
   const [extraFields, setExtraFields] = useState<{ name: string; value: string; group: string }[]>([]);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [showAudit, setShowAudit] = useState(false);
   const [manualAnnot, setManualAnnot] = useState<Record<string, true>>({});
   const [confOverride, setConfOverride] = useState<Record<string, "high" | "medium" | "low">>({});
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; text: string; editable?: boolean } | null>(null);
@@ -444,9 +441,6 @@ function ValidationScreen({
         </div>
 
         <div className="ml-auto flex items-center gap-1.5">
-          <button onClick={() => setShowAudit((v) => !v)} className={`h-8 px-2 rounded-md text-[10px] font-mono border flex items-center gap-1 transition ${showAudit ? "border-cyan/40 bg-cyan/10 text-cyan" : "border-border hover:border-cyan/30"}`} title="Audit trail">
-            <History className="size-3" /> AUDIT
-          </button>
           <button onClick={() => setShowShortcuts((v) => !v)} className="h-8 w-8 grid place-items-center rounded-md border border-border hover:border-cyan/30 transition" title="Keyboard shortcuts (?)">
             <Keyboard className="size-3.5" />
           </button>
@@ -751,7 +745,10 @@ function ValidationScreen({
             </button>
             <button
               disabled={pendingLeft > 0}
-              onClick={onComplete}
+              onClick={() => {
+                onComplete();
+                navigate({ to: "/solutions/$id", params: { id: job.solutionId }, search: { tab: "jobs" } as Record<string, string> });
+              }}
               className="h-8 px-3 rounded-md text-[11px] font-mono bg-gradient-to-r from-cyan to-cyan/90 text-white disabled:opacity-40 flex items-center gap-1.5 shadow-md hover:shadow-lg transition"
               title={pendingLeft > 0 ? `${pendingLeft} records still pending` : "Submit batch"}
             >
@@ -860,30 +857,6 @@ function ValidationScreen({
 
 
 
-
-      {/* ============ Audit trail drawer ============ */}
-      {showAudit && (
-        <div className="fixed top-16 right-4 z-30 w-80 max-h-[70vh] rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-2xl flex flex-col">
-          <div className="px-3 py-2 border-b border-border flex items-center gap-2">
-            <History className="size-3.5 text-cyan" />
-            <span className="text-[11px] font-semibold tracking-wide">Audit trail · activity</span>
-            <button onClick={() => setShowAudit(false)} className="ml-auto h-6 w-6 grid place-items-center hover:bg-surface-elevated rounded transition"><X className="size-3" /></button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {auditLog.map((a, i) => (
-              <div key={i} className="flex gap-2 text-[10px] font-mono p-1.5 rounded hover:bg-surface-elevated/40">
-                <span className={`mt-1 size-1.5 rounded-full shrink-0 ${
-                  a.tone === "success" ? "bg-success" : a.tone === "danger" ? "bg-danger" : a.tone === "amber" ? "bg-amber" : "bg-cyan"
-                }`} />
-                <div className="flex-1">
-                  <div className="text-foreground">{a.msg}</div>
-                  <div className="text-muted-foreground">{new Date(a.at).toLocaleTimeString()}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* ============ Keyboard shortcuts modal ============ */}
       {showShortcuts && (
@@ -1095,7 +1068,7 @@ function buildFieldsFallbackHtml(item: HitlItem): string {
       const confColor = conf >= 90 ? "#22c55e" : conf >= 75 ? "#f59e0b" : "#ef4444";
       return `<tr>
         <td style="padding:7px 12px;color:${mutedColor};font-size:12px;border-bottom:1px solid ${borderColor};white-space:nowrap">${f.name}</td>
-        <td style="padding:7px 12px;font-size:13px;font-weight:500;border-bottom:1px solid ${borderColor};color:${fg}">${f.value || "—"}</td>
+        <td data-hitl="${f.name}" style="padding:7px 12px;font-size:13px;font-weight:500;border-bottom:1px solid ${borderColor};color:${fg}">${f.value || "—"}</td>
         <td style="padding:7px 12px;font-size:10px;color:${confColor};border-bottom:1px solid ${borderColor};text-align:right;font-family:monospace">${conf}%</td>
       </tr>`;
     }).join("");
@@ -1397,29 +1370,29 @@ function VehicleBrandPage({ f, item }: { f: Record<string, string>; item: HitlIt
       <div className="p-5 space-y-4">
         <h2 className="text-base font-semibold">Performance & Powertrain</h2>
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
-          {[
-            ["Drivetrain", f.drivetrain || "AWD"],
-            ["Battery", `${f.battery_kwh || "—"} kWh`],
-            ["Range (EPA est.)", `${f.range_mi || "—"} mi`],
-            ["0–60 mph", `${f.zero_to_sixty_s || "—"} s`],
-            ["Top speed", "130 mph (electronically limited)"],
-            ["Charging (DC)", "Up to 145 kW"],
-          ].map(([k, v]) => (
+          {([
+            ["Drivetrain", "drivetrain", f.drivetrain || "AWD"],
+            ["Battery", "battery_kwh", `${f.battery_kwh || "—"} kWh`],
+            ["Range (EPA est.)", "range_mi", `${f.range_mi || "—"} mi`],
+            ["0–60 mph", "zero_to_sixty_s", `${f.zero_to_sixty_s || "—"} s`],
+            ["Top speed", "", "130 mph (electronically limited)"],
+            ["Charging (DC)", "", "Up to 145 kW"],
+          ] as [string, string, string][]).map(([k, fn, v]) => (
             <div key={k} className="flex justify-between border-b border-dashed border-neutral-200 py-1">
-              <span className="text-neutral-500">{k}</span><span className="font-medium">{v}</span>
+              <span className="text-neutral-500">{k}</span><span data-field={fn || undefined} className="font-medium">{v}</span>
             </div>
           ))}
         </div>
         <h2 className="text-base font-semibold pt-3">Dimensions</h2>
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
-          {[
-            ["Length", `${f.length_in || "—"} in`],
-            ["Wheelbase", `${f.wheelbase_in || "—"} in`],
-            ["Curb weight", "4,365 lb"],
-            ["Cargo (max)", "57.2 cu ft"],
-          ].map(([k, v]) => (
+          {([
+            ["Length", "length_in", `${f.length_in || "—"} in`],
+            ["Wheelbase", "wheelbase_in", `${f.wheelbase_in || "—"} in`],
+            ["Curb weight", "", "4,365 lb"],
+            ["Cargo (max)", "", "57.2 cu ft"],
+          ] as [string, string, string][]).map(([k, fn, v]) => (
             <div key={k} className="flex justify-between border-b border-dashed border-neutral-200 py-1">
-              <span className="text-neutral-500">{k}</span><span className="font-medium">{v}</span>
+              <span className="text-neutral-500">{k}</span><span data-field={fn || undefined} className="font-medium">{v}</span>
             </div>
           ))}
         </div>
@@ -1434,7 +1407,7 @@ function VehicleBrandPage({ f, item }: { f: Record<string, string>; item: HitlIt
         <h2 className="text-base font-semibold pt-3">Pricing</h2>
         <table className="w-full text-[12px] border-t border-neutral-200">
           <tbody>
-            <tr className="border-b"><td className="py-2 text-neutral-500">{trim}</td><td className="py-2 text-right font-semibold">{msrp}</td></tr>
+            <tr className="border-b"><td className="py-2 text-neutral-500"><span data-field="trim">{trim}</span></td><td className="py-2 text-right font-semibold"><span data-field="msrp">{msrp}</span></td></tr>
             <tr className="border-b"><td className="py-2 text-neutral-500">Destination & handling</td><td className="py-2 text-right">$995</td></tr>
             <tr><td className="py-2 text-neutral-500">As shown</td><td className="py-2 text-right font-semibold">{msrp}</td></tr>
           </tbody>
@@ -1459,8 +1432,13 @@ function NewsArticlePage({ f, item }: { f: Record<string, string>; item: HitlIte
       <div className="p-5 space-y-4">
         <div className="text-[10px] tracking-widest text-neutral-500">AUTOMOTIVE · {new Date().toDateString()}</div>
         <h1 className="text-2xl font-serif font-bold leading-tight">{item.summary}</h1>
-        <div className="text-[11px] text-neutral-500 flex gap-3 border-b pb-3">
-          <span>By Reuters Staff</span><span>·</span><span>4 min read</span><span>·</span><span>{f.cluster || "EV Supply"}</span>
+        <div className="text-[11px] text-neutral-500 flex gap-3 border-b pb-3 flex-wrap">
+          <span>By Reuters Staff</span><span>·</span><span>4 min read</span><span>·</span>
+          <span data-field="cluster">{f.cluster || "EV Supply"}</span>
+          {f.sentiment && <span>·</span>}
+          {f.sentiment && <span data-field="sentiment" className="px-1.5 py-0.5 rounded text-[10px] bg-green-100 text-green-800 font-medium">{f.sentiment}</span>}
+          {f.impact && <span>·</span>}
+          {f.impact && <span data-field="impact" className="px-1.5 py-0.5 rounded text-[10px] bg-orange-100 text-orange-800 font-medium">{f.impact}</span>}
         </div>
         <div className="h-40 bg-gradient-to-br from-neutral-300 to-neutral-500 rounded grid place-items-center text-white text-xs italic">[ wire photo ]</div>
         <p className="text-[13px] leading-relaxed text-neutral-800 font-serif">
@@ -1493,11 +1471,11 @@ function EvStationPage({ f, item }: { f: Record<string, string>; item: HitlItem 
       <div className="bg-[#0a8f3c] text-white px-4 h-10 flex items-center font-semibold tracking-wide text-sm">⚡ ChargePoint · Station Locator</div>
       <div className="h-32 bg-[url('https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800')] bg-cover bg-center" />
       <div className="p-5 space-y-3">
-        <h1 className="text-xl font-bold">{f.station_name || item.recordName}</h1>
-        <div className="text-[12px] text-neutral-600">{f.city}, {f.state} · {f.network || "ChargePoint"}</div>
+        <h1 className="text-xl font-bold" data-field="station_name">{f.station_name || item.recordName}</h1>
+        <div className="text-[12px] text-neutral-600"><span data-field="city">{f.city}</span>, <span data-field="state">{f.state}</span> · <span data-field="network">{f.network || "ChargePoint"}</span></div>
         <div className="grid grid-cols-2 gap-3 text-[12px] border-t pt-3">
-          {[["Connector type", f.type], ["Power", f.power], ["Pricing", f.pricing], ["Availability", f.availability], ["Network", f.network], ["Open hours", "24/7"]].map(([k, v]) => (
-            <div key={k} className="flex justify-between border-b border-dashed py-1.5"><span className="text-neutral-500">{k}</span><span className="font-medium">{v || "—"}</span></div>
+          {([["Connector type", "type", f.type], ["Power", "power", f.power], ["Pricing", "pricing", f.pricing], ["Availability", "availability", f.availability], ["Network", "network", f.network], ["Open hours", "", "24/7"]] as [string, string, string][]).map(([k, fn, v]) => (
+            <div key={k} className="flex justify-between border-b border-dashed py-1.5"><span className="text-neutral-500">{k}</span><span data-field={fn || undefined} className="font-medium">{v || "—"}</span></div>
           ))}
         </div>
         <div className="text-[12px] pt-3 leading-relaxed">{item.detail}</div>
@@ -1511,14 +1489,14 @@ function EvStationPage({ f, item }: { f: Record<string, string>; item: HitlItem 
 function DealerPage({ f, item }: { f: Record<string, string>; item: HitlItem }) {
   return (
     <div className="bg-white text-neutral-900 shadow-xl rounded overflow-hidden mx-auto max-w-[640px]">
-      <div className="bg-[#0b3d91] text-white px-4 h-10 flex items-center font-semibold text-sm">{f.dealer || item.recordName} · Authorized Dealer</div>
+      <div className="bg-[#0b3d91] text-white px-4 h-10 flex items-center font-semibold text-sm"><span data-field="dealer">{f.dealer || item.recordName}</span> · Authorized Dealer</div>
       <div className="p-5 space-y-3">
         <div className="text-[11px] text-neutral-500 tracking-widest">SHOWROOM</div>
-        <h1 className="text-xl font-bold">{f.dealer || item.recordName}</h1>
-        <div className="text-[12px] text-neutral-600">{f.city || "—"} · {f.oem || "Multi-OEM"}</div>
+        <h1 className="text-xl font-bold" data-field="dealer">{f.dealer || item.recordName}</h1>
+        <div className="text-[12px] text-neutral-600"><span data-field="city">{f.city || "—"}</span> · <span data-field="oem">{f.oem || "Multi-OEM"}</span></div>
         <div className="grid grid-cols-2 gap-3 text-[12px] border-t pt-3">
-          {[["Inventory", f.inventory], ["Avg Days on Lot", f.avg_dol], ["Sales velocity", f.velocity], ["Insight", f.insight]].map(([k, v]) => (
-            <div key={k} className="flex justify-between border-b border-dashed py-1.5"><span className="text-neutral-500">{k}</span><span className="font-medium">{v || "—"}</span></div>
+          {([["Inventory", "inventory", f.inventory], ["Avg Days on Lot", "avg_dol", f.avg_dol], ["Sales velocity", "velocity", f.velocity], ["Insight", "insight", f.insight]] as [string, string, string][]).map(([k, fn, v]) => (
+            <div key={k} className="flex justify-between border-b border-dashed py-1.5"><span className="text-neutral-500">{k}</span><span data-field={fn} className="font-medium">{v || "—"}</span></div>
           ))}
         </div>
       </div>
@@ -1535,7 +1513,7 @@ function GenericSitePage({ f, item }: { f: Record<string, string>; item: HitlIte
       <table className="mt-3 w-full text-[12px]">
         <tbody>
           {Object.entries(f).slice(0, 10).map(([k, v]) => (
-            <tr key={k} className="border-t"><td className="py-1 text-neutral-500">{k}</td><td className="py-1 font-medium">{v}</td></tr>
+            <tr key={k} className="border-t"><td className="py-1 text-neutral-500">{k}</td><td data-field={k} className="py-1 font-medium">{v}</td></tr>
           ))}
         </tbody>
       </table>
@@ -1606,19 +1584,19 @@ function OemConfiguratorPage({ f, item }: { f: Record<string, string>; item: Hit
         </div>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
-          {[
-            ["Model", model],
-            ["Trim", trim],
-            ["Drivetrain", f.drivetrain || "AWD"],
-            ["Battery", `${f.battery_kwh || "81.5"} kWh`],
-            ["Range (EPA est.)", `${f.range_mi || "307"} mi`],
-            ["0–60 mph", `${f.zero_to_sixty_s || "4.6"} s`],
-            ["Exterior color", f.color || "Frozen Pure Grey Metallic"],
-            ["Interior", f.interior || "Veganza Mocha"],
-            ["Wheels", f.wheels || "20\" M Aerodynamic Bicolour"],
-          ].map(([k, v]) => (
+          {([
+            ["Model", "model", model],
+            ["Trim", "trim", trim],
+            ["Drivetrain", "drivetrain", f.drivetrain || "AWD"],
+            ["Battery", "battery_kwh", `${f.battery_kwh || "81.5"} kWh`],
+            ["Range (EPA est.)", "range_mi", `${f.range_mi || "307"} mi`],
+            ["0–60 mph", "zero_to_sixty_s", `${f.zero_to_sixty_s || "4.6"} s`],
+            ["Exterior color", "color", f.color || "Frozen Pure Grey Metallic"],
+            ["Interior", "interior", f.interior || "Veganza Mocha"],
+            ["Wheels", "wheels", f.wheels || '20" M Aerodynamic Bicolour'],
+          ] as [string, string, string][]).map(([k, fn, v]) => (
             <div key={k} className="flex justify-between border-b border-dashed border-neutral-200 py-1.5">
-              <span className="text-neutral-500">{k}</span><span className="font-medium text-right ml-3">{v}</span>
+              <span className="text-neutral-500">{k}</span><span data-field={fn} className="font-medium text-right ml-3">{v}</span>
             </div>
           ))}
         </div>
@@ -1697,10 +1675,10 @@ function VehicleSpecSheetPdf({ f, item }: { f: Record<string, string>; item: Hit
         <div className="mt-3 grid grid-cols-2 gap-x-6 flex-1">
           <div>
             <SectionTitle>POWERTRAIN</SectionTitle>
-            <PdfRow k="Drivetrain" v={f.drivetrain || "AWD"} />
-            <PdfRow k="Battery capacity" v={`${f.battery_kwh || "—"} kWh`} />
-            <PdfRow k="Range (EPA est.)" v={`${f.range_mi || "—"} mi`} />
-            <PdfRow k="0–60 mph" v={`${f.zero_to_sixty_s || "—"} s`} />
+            <PdfRow k="Drivetrain" v={f.drivetrain || "AWD"} field="drivetrain" />
+            <PdfRow k="Battery capacity" v={`${f.battery_kwh || "—"} kWh`} field="battery_kwh" />
+            <PdfRow k="Range (EPA est.)" v={`${f.range_mi || "—"} mi`} field="range_mi" />
+            <PdfRow k="0–60 mph" v={`${f.zero_to_sixty_s || "—"} s`} field="zero_to_sixty_s" />
             <PdfRow k="Peak power" v="288 kW (385 hp)" />
             <PdfRow k="Peak torque" v="565 lb-ft" />
 
@@ -1711,15 +1689,15 @@ function VehicleSpecSheetPdf({ f, item }: { f: Record<string, string>; item: Hit
           </div>
           <div>
             <SectionTitle>DIMENSIONS</SectionTitle>
-            <PdfRow k="Length" v={`${f.length_in || "—"} in`} />
-            <PdfRow k="Wheelbase" v={`${f.wheelbase_in || "—"} in`} />
+            <PdfRow k="Length" v={`${f.length_in || "—"} in`} field="length_in" />
+            <PdfRow k="Wheelbase" v={`${f.wheelbase_in || "—"} in`} field="wheelbase_in" />
             <PdfRow k="Width (w/ mirrors)" v="83.1 in" />
             <PdfRow k="Height" v="59.6 in" />
             <PdfRow k="Curb weight" v="5,597 lb" />
             <PdfRow k="Cargo (rear seats up)" v="15.0 cu ft" />
 
             <SectionTitle>PRICING</SectionTitle>
-            <PdfRow k="MSRP" v={f.msrp || "—"} />
+            <PdfRow k="MSRP" v={f.msrp || "—"} field="msrp" />
             <PdfRow k="Destination & delivery" v="$1,150" />
             <PdfRow k="As shown" v={f.msrp || "—"} />
           </div>
@@ -1785,8 +1763,8 @@ function PlantDataSheetPdf({ f, item }: { f: Record<string, string>; item: HitlI
       <div className="flex items-start justify-between border-b-2 border-[#0b3d91] pb-3">
         <div>
           <div className="text-[9px] tracking-[0.3em] text-[#0b3d91]">PLANT REGISTRY · ENTITY SHEET</div>
-          <div className="text-2xl font-semibold mt-1">{f.plant_name || item.recordName}</div>
-          <div className="text-[12px] text-neutral-600">{f.supplier_group || "ZF Friedrichshafen AG"}</div>
+          <div className="text-2xl font-semibold mt-1" data-field="plant_name">{f.plant_name || item.recordName}</div>
+          <div className="text-[12px] text-neutral-600" data-field="supplier_group">{f.supplier_group || "ZF Friedrichshafen AG"}</div>
         </div>
         <div className="text-right text-[9px] text-neutral-500">
           <div>Ref. PLT-{(item.id || "").slice(0, 6).toUpperCase()}</div>
@@ -1797,12 +1775,12 @@ function PlantDataSheetPdf({ f, item }: { f: Record<string, string>; item: HitlI
       <div className="mt-4 grid grid-cols-2 gap-x-6">
         <div>
           <SectionTitle>LOCATION</SectionTitle>
-          <PdfRow k="Address" v={f.address_line1 || "1 Industriestrasse"} />
-          <PdfRow k="City" v={f.city || "Friedrichshafen"} />
-          <PdfRow k="State / Province" v={f["state / province"] || f.state || "Baden-Württemberg"} />
-          <PdfRow k="Country" v={f.country || "Germany"} />
-          <PdfRow k="Latitude" v={f.latitude || "47.6779"} />
-          <PdfRow k="Longitude" v={f.longitude || "9.4731"} />
+          <PdfRow k="Address" v={f.address_line1 || "1 Industriestrasse"} field="address_line1" />
+          <PdfRow k="City" v={f.city || "Friedrichshafen"} field="city" />
+          <PdfRow k="State / Province" v={f["state / province"] || f.state || "Baden-Württemberg"} field="state" />
+          <PdfRow k="Country" v={f.country || "Germany"} field="country" />
+          <PdfRow k="Latitude" v={f.latitude || "47.6779"} field="latitude" />
+          <PdfRow k="Longitude" v={f.longitude || "9.4731"} field="longitude" />
         </div>
         <div>
           <SectionTitle>OPERATIONS</SectionTitle>
@@ -1834,11 +1812,11 @@ function PlantDataSheetPdf({ f, item }: { f: Record<string, string>; item: HitlI
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div className="mt-3 mb-1 text-[9px] tracking-[0.25em] font-bold text-neutral-900 border-b border-neutral-300 pb-1">{children}</div>;
 }
-function PdfRow({ k, v }: { k: string; v: string }) {
+function PdfRow({ k, v, field }: { k: string; v: string; field?: string }) {
   return (
     <div className="flex justify-between py-1 border-b border-dashed border-neutral-200">
       <span className="text-neutral-500">{k}</span>
-      <span className="font-medium text-right ml-3 truncate" title={v}>{v}</span>
+      <span data-field={field} className="font-medium text-right ml-3 truncate" title={v}>{v}</span>
     </div>
   );
 }

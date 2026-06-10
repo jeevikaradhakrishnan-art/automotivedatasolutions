@@ -123,9 +123,9 @@ const VEHICLE_FIELDS = (oem: string, model: string, trim: string, msrp: string):
   { group: "powertrain", name: "drivetrain", value: "AWD", confidence: 100 },
   { group: "powertrain", name: "battery_kwh", value: "75", confidence: 78 },
   { group: "powertrain", name: "range_mi", value: "290", confidence: 84 },
-  { group: "powertrain", name: "zero_to_sixty_s", value: "4.8", confidence: 88 },
+  { group: "powertrain", name: "zero_to_sixty_s", value: "", confidence: 88 },
   { group: "dimensions", name: "length_in", value: "187.0", confidence: 100 },
-  { group: "dimensions", name: "wheelbase_in", value: "113.8", confidence: 100 },
+  { group: "dimensions", name: "wheelbase_in", value: "", confidence: 100 },
 ];
 const PLANT_FIELDS = (name: string): HitlField[] => [
   { group: "plant_information", name: "plant_name", value: name, confidence: 100 },
@@ -137,7 +137,7 @@ const PLANT_FIELDS = (name: string): HitlField[] => [
   { group: "geo", name: "latitude", value: "47.6541", confidence: 81 },
   { group: "geo", name: "longitude", value: "9.4779", confidence: 81 },
   { group: "operations", name: "headcount", value: "2,400", confidence: 70 },
-  { group: "operations", name: "annual_capacity", value: "1.2M units", confidence: 64 },
+  { group: "operations", name: "annual_capacity", value: "", confidence: 64 },
 ];
 const NEWS_FIELDS: HitlField[] = [
   { group: "article", name: "headline", value: "BYD secures lithium supply deal in Atacama", confidence: 100 },
@@ -145,7 +145,7 @@ const NEWS_FIELDS: HitlField[] = [
   { group: "article", name: "published_at", value: "2025-05-21T08:14Z", confidence: 100 },
   { group: "classification", name: "cluster", value: "EV Supply Chain", confidence: 81 },
   { group: "classification", name: "sentiment", value: "Positive", confidence: 86 },
-  { group: "classification", name: "impact", value: "High", confidence: 78 },
+  { group: "classification", name: "impact", value: "", confidence: 78 },
   { group: "entities", name: "primary_oem", value: "BYD", confidence: 100 },
   { group: "entities", name: "region", value: "South America", confidence: 95 },
 ];
@@ -397,57 +397,7 @@ const seedJobs = (): Job[] => [
   },
 ];
 
-const seedHitl = (): HitlItem[] => {
-  const items: HitlItem[] = [];
-  // Vehicle Ford batch (4 records)
-  const fordModels = [
-    { model: "Mustang Mach-E", trim: "Rally GT Performance", msrp: "$64,995" },
-    { model: "F-150 Lightning", trim: "Platinum",            msrp: "$84,995" },
-    { model: "Explorer",        trim: "ST-Line",             msrp: "$48,795" },
-    { model: "Bronco Sport",    trim: "Badlands",            msrp: "$36,890" },
-  ];
-  fordModels.forEach((m, i) => items.push({
-    id: `h-veh-ford-${i}`, solutionId: "vehicle-spec", jobId: "j-veh-101", workflow: "OEM Catalog · Weekly Crawl",
-    recordName: `${m.model} · ${m.trim}`,
-    summary: `${m.model} ${m.trim}`,
-    detail: `New trim discovered on Ford configurator. Verify MSRP and powertrain mapping against customer template.`,
-    field: "trim/msrp", proposed: m.trim, current: "—",
-    fields: VEHICLE_FIELDS("Ford", m.model, m.trim, m.msrp),
-    confidence: 78 - i * 3, status: "pending", createdAt: new Date(NOW() - 18*M + i * 1000).toISOString(), previewKind: i % 2 === 0 ? "pdf" : "html",
-  }));
-  // Vehicle BMW batch (3 records)
-  const bmwModels = [
-    { model: "iX1", trim: "xDrive30 M Sport", msrp: "$52,900" },
-    { model: "i5",  trim: "eDrive40",         msrp: "$66,800" },
-    { model: "X5",  trim: "xDrive50e",        msrp: "$73,800" },
-  ];
-  bmwModels.forEach((m, i) => items.push({
-    id: `h-veh-bmw-${i}`, solutionId: "vehicle-spec", jobId: "j-veh-102", workflow: "OEM Catalog · Weekly Crawl",
-    recordName: `${m.model} · ${m.trim}`,
-    summary: `${m.model} ${m.trim}`,
-    detail: `Confidence below threshold on battery_kwh field — verify before shipping to customer template.`,
-    field: "battery_kwh", proposed: "82 kWh", current: "—",
-    fields: VEHICLE_FIELDS("BMW", m.model, m.trim, m.msrp),
-    confidence: 74 - i * 4, status: "pending", createdAt: new Date(NOW() - 18*M + 5000 + i * 1000).toISOString(), previewKind: i === 1 ? "pdf" : "html",
-  }));
-  // News batch (3 articles)
-  ["BYD secures lithium supply deal in Atacama", "Toyota patent splits V2G / V2X classification", "GM Cruise restarts limited autonomy pilot"].forEach((h, i) => items.push({
-    id: `h-news-${i}`, solutionId: "news", jobId: "j-news-014", workflow: "News · Continuous",
-    recordName: h, summary: h, detail: "Verify clustering, sentiment and impact classification before shipping insight.",
-    field: "cluster", proposed: "EV Supply Chain", current: "Lithium",
-    fields: NEWS_FIELDS,
-    confidence: 81 - i * 5, status: "pending", createdAt: new Date(NOW() - 25*M + i * 1000).toISOString(), previewKind: "html",
-  }));
-  // Plants batch (5 records)
-  ["ZF Friedrichshafen Plant 1", "ZF Saarbrücken", "ZF Schweinfurt", "ZF Lebanon TN", "ZF Pune"].forEach((n, i) => items.push({
-    id: `h-plant-${i}`, solutionId: "plants", jobId: "j-plant-007", workflow: "Plants · Full Refresh",
-    recordName: n, summary: n, detail: "Verify supplier-group normalization and geocoding accuracy.",
-    field: "supplier_group", proposed: "ZF Friedrichshafen AG", current: "ZF Group",
-    fields: PLANT_FIELDS(n),
-    confidence: 70 - i * 2, status: "pending", createdAt: new Date(Date.now() - 1000 * 60 * (15 + i)).toISOString(), previewKind: "pdf",
-  }));
-  return items;
-};
+const seedHitl = (): HitlItem[] => [];
 
 export const usePlatform = create<PlatformState>()(
   persist(
@@ -523,7 +473,7 @@ export const usePlatform = create<PlatformState>()(
       },
     }),
     {
-      name: "xdas-platform-v9",
+      name: "xdas-platform-v10",
       storage: createJSONStorage(() =>
         typeof window !== "undefined"
           ? window.localStorage

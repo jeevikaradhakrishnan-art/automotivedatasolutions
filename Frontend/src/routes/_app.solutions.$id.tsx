@@ -341,7 +341,13 @@ function SolutionDetail() {
           return (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
+              onClick={() => {
+                if (t.id === "insights") {
+                  window.open("http://3.7.204.198:3000/analysis", "_blank", "noopener,noreferrer");
+                  return;
+                }
+                setTab(t.id);
+              }}
               className={`px-3 h-9 -mb-px text-xs font-mono flex items-center gap-1.5 border-b-2 transition whitespace-nowrap ${
                 Active ? "border-cyan text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
@@ -1223,9 +1229,9 @@ function SolutionReviewQueue({ solutionId }: { solutionId: string }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-[11px] font-mono">
-        <span className="px-2 py-1 rounded border border-amber/30 text-amber bg-amber/5">⏳ {totalPending} PENDING</span>
-        <span className="px-2 py-1 rounded border border-success/30 text-success bg-success/5">✓ {totalApproved} APPROVED</span>
-        <span className="px-2 py-1 rounded border border-danger/30 text-danger bg-danger/5">✕ {totalRejected} REJECTED</span>
+        <span className="px-2 py-1 rounded border border-amber/30 text-amber bg-amber/5">⏳ {totalPending} PENDING RECORDS</span>
+        <span className="px-2 py-1 rounded border border-success/30 text-success bg-success/5">✓ {totalApproved} APPROVED RECORDS</span>
+        <span className="px-2 py-1 rounded border border-danger/30 text-danger bg-danger/5">✕ {totalRejected} REJECTED RECORDS</span>
       </div>
 
       <div className="border border-border rounded-md overflow-hidden">

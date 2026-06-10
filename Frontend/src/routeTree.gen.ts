@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AutomotiveDataSolutionsAdminRouteImport } from './routes/automotive-data-solutions-admin'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
-import { Route as AppManageRouteImport } from './routes/_app.manage'
 import { Route as AppHitlRouteImport } from './routes/_app.hitl'
 import { Route as AppCapabilitiesRouteImport } from './routes/_app.capabilities'
 import { Route as AppAdminRouteImport } from './routes/_app.admin'
@@ -34,11 +33,6 @@ const AppRoute = AppRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppManageRoute = AppManageRouteImport.update({
-  id: '/manage',
-  path: '/manage',
   getParentRoute: () => AppRoute,
 } as any)
 const AppHitlRoute = AppHitlRouteImport.update({
@@ -83,7 +77,6 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AppAdminRoute
   '/capabilities': typeof AppCapabilitiesRouteWithChildren
   '/hitl': typeof AppHitlRoute
-  '/manage': typeof AppManageRoute
   '/capabilities/$id': typeof AppCapabilitiesIdRoute
   '/solutions/$id': typeof AppSolutionsIdRoute
   '/capabilities/': typeof AppCapabilitiesIndexRoute
@@ -93,7 +86,6 @@ export interface FileRoutesByTo {
   '/automotive-data-solutions-admin': typeof AutomotiveDataSolutionsAdminRoute
   '/admin': typeof AppAdminRoute
   '/hitl': typeof AppHitlRoute
-  '/manage': typeof AppManageRoute
   '/': typeof AppIndexRoute
   '/capabilities/$id': typeof AppCapabilitiesIdRoute
   '/solutions/$id': typeof AppSolutionsIdRoute
@@ -107,7 +99,6 @@ export interface FileRoutesById {
   '/_app/admin': typeof AppAdminRoute
   '/_app/capabilities': typeof AppCapabilitiesRouteWithChildren
   '/_app/hitl': typeof AppHitlRoute
-  '/_app/manage': typeof AppManageRoute
   '/_app/': typeof AppIndexRoute
   '/_app/capabilities/$id': typeof AppCapabilitiesIdRoute
   '/_app/solutions/$id': typeof AppSolutionsIdRoute
@@ -122,7 +113,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/capabilities'
     | '/hitl'
-    | '/manage'
     | '/capabilities/$id'
     | '/solutions/$id'
     | '/capabilities/'
@@ -132,7 +122,6 @@ export interface FileRouteTypes {
     | '/automotive-data-solutions-admin'
     | '/admin'
     | '/hitl'
-    | '/manage'
     | '/'
     | '/capabilities/$id'
     | '/solutions/$id'
@@ -145,7 +134,6 @@ export interface FileRouteTypes {
     | '/_app/admin'
     | '/_app/capabilities'
     | '/_app/hitl'
-    | '/_app/manage'
     | '/_app/'
     | '/_app/capabilities/$id'
     | '/_app/solutions/$id'
@@ -179,13 +167,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/manage': {
-      id: '/_app/manage'
-      path: '/manage'
-      fullPath: '/manage'
-      preLoaderRoute: typeof AppManageRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/hitl': {
@@ -258,7 +239,6 @@ interface AppRouteChildren {
   AppAdminRoute: typeof AppAdminRoute
   AppCapabilitiesRoute: typeof AppCapabilitiesRouteWithChildren
   AppHitlRoute: typeof AppHitlRoute
-  AppManageRoute: typeof AppManageRoute
   AppIndexRoute: typeof AppIndexRoute
   AppSolutionsIdRoute: typeof AppSolutionsIdRoute
   AppSolutionsIndexRoute: typeof AppSolutionsIndexRoute
@@ -268,7 +248,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminRoute: AppAdminRoute,
   AppCapabilitiesRoute: AppCapabilitiesRouteWithChildren,
   AppHitlRoute: AppHitlRoute,
-  AppManageRoute: AppManageRoute,
   AppIndexRoute: AppIndexRoute,
   AppSolutionsIdRoute: AppSolutionsIdRoute,
   AppSolutionsIndexRoute: AppSolutionsIndexRoute,

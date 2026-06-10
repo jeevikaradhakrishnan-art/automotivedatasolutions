@@ -357,6 +357,181 @@ def _try_playwright(url: str, model: str, screenshot_path: Path | None = None) -
     return None
 
 
+# ── Tesla-styled local HTML generator ─────────────────────────────────────────
+def _generate_tesla_html(page: dict, specs: dict) -> str:
+    """Generate a Tesla-styled HTML page from KNOWN_SPECS for HITL LHS."""
+    model       = page["model"]
+    region      = page["region"]
+    currency    = page["currency"]
+    conf_url    = page["url"]
+    trims       = specs.get("trims", [])
+    colors      = specs.get("colors", [])
+    wheels      = specs.get("wheels", [])
+    interior    = specs.get("interior", [])
+    autopilot   = specs.get("autopilot", "")
+    seating     = specs.get("seating", "")
+    cargo       = specs.get("cargo", "")
+    charge_time = specs.get("charge_time", "")
+    range_label = specs.get("range_label", "Range")
+    ground_clr  = specs.get("ground_clearance", "")
+    body_mat    = specs.get("body_material", "")
+    vault_len   = specs.get("vault_length", "")
+
+    # Build trim cards
+    trim_cards = ""
+    for t in trims:
+        specs_list = ""
+        for key, label in [("range", range_label), ("range_km", "Range (km)"),
+                           ("accel", "0–60 / 0–100"), ("top_speed", "Top Speed"),
+                           ("horsepower", "Peak Power"), ("drivetrain", "Drivetrain"),
+                           ("towing", "Towing"), ("payload", "Payload")]:
+            val = t.get(key, "")
+            if val:
+                specs_list += f"<div class='spec-row'><span class='sl'>{label}</span><span class='sv'>{val}</span></div>"
+        trim_cards += f"""
+        <div class='trim-card'>
+          <div class='trim-name'>{t.get('name','')}</div>
+          <div class='trim-price'>{t.get('price','')}</div>
+          <div class='trim-specs'>{specs_list}</div>
+        </div>"""
+
+    # Build colour swatches
+    COLOUR_HEX = {
+        "white": "#f0f0f0", "pearl": "#f0f0f0", "silver": "#c0c0c0",
+        "black": "#1a1a1a", "grey": "#888", "gray": "#888", "stealth": "#444",
+        "blue": "#1c3b6e", "deep blue": "#1c3b6e", "red": "#a31621",
+        "cherry": "#a31621", "ultra red": "#c0392b", "green": "#1e6b3f",
+        "yellow": "#c9a227", "gold": "#c9a227", "orange": "#c0602a",
+        "quicksilver": "#adb5bd",
+    }
+    colour_swatches = ""
+    for c in colors:
+        name = c.get("name", "")
+        price = c.get("price", "")
+        ctype = c.get("type", "Option")
+        bg = "#555"
+        for word, hex_val in COLOUR_HEX.items():
+            if word in name.lower():
+                bg = hex_val
+                break
+        colour_swatches += f"""<div class='swatch' style='background:{bg}' title='{name}'>
+          <div class='sw-tip'>{name}<br><small>{price} · {ctype}</small></div></div>"""
+
+    # Wheels
+    wheel_items = "".join(
+        f"<div class='opt-item'><span class='opt-name'>{w.get('name','')}</span>"
+        f"<span class='opt-price'>{w.get('price','')} · {w.get('type','')}</span></div>"
+        for w in wheels
+    )
+
+    # Interior
+    int_items = "".join(
+        f"<div class='opt-item'><span class='opt-name'>{i.get('name','')}</span>"
+        f"<span class='opt-price'>{i.get('price','')} · {i.get('type','')}</span></div>"
+        for i in interior
+    )
+
+    # Extra specs row
+    extra_specs = ""
+    for label, val in [("Seating", seating), ("Cargo", cargo), ("Autopilot", autopilot),
+                       ("Charge Time", charge_time), ("Ground Clearance", ground_clr),
+                       ("Body Material", body_mat), ("Vault Length", vault_len)]:
+        if val:
+            extra_specs += f"<div class='spec-row'><span class='sl'>{label}</span><span class='sv'>{val}</span></div>"
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{model} — Tesla Configurator ({region})</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:'Gotham','Helvetica Neue',Arial,sans-serif;background:#171a20;color:#fff;min-height:100vh}}
+  .header{{background:#171a20;border-bottom:1px solid #2a2d35;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}}
+  .tesla-wordmark{{font-size:20px;font-weight:700;letter-spacing:6px;color:#fff}}
+  .nav-link{{font-size:12px;color:#aaa;text-decoration:none;letter-spacing:1px}}
+  .nav-link:hover{{color:#fff}}
+  .hero{{background:linear-gradient(180deg,#1f2229 0%,#171a20 100%);padding:48px 32px 32px;text-align:center}}
+  .model-tag{{font-size:11px;letter-spacing:4px;color:#aaa;text-transform:uppercase;margin-bottom:8px}}
+  .model-title{{font-size:48px;font-weight:300;letter-spacing:-1px;color:#fff;margin-bottom:6px}}
+  .region-badge{{display:inline-block;background:#2a2d35;color:#aaa;font-size:11px;letter-spacing:2px;padding:4px 12px;border-radius:20px;margin-bottom:24px}}
+  .content{{max-width:960px;margin:0 auto;padding:32px 24px;display:grid;gap:28px}}
+  .section-label{{font-size:11px;letter-spacing:3px;color:#aaa;text-transform:uppercase;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #2a2d35}}
+  .trim-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}}
+  .trim-card{{background:#1f2229;border:1px solid #2a2d35;border-radius:8px;padding:20px;transition:border-color .2s}}
+  .trim-card:hover{{border-color:#3e6ae1}}
+  .trim-name{{font-size:14px;font-weight:500;color:#fff;margin-bottom:4px}}
+  .trim-price{{font-size:22px;font-weight:300;color:#3e6ae1;margin-bottom:16px}}
+  .trim-specs{{display:flex;flex-direction:column;gap:6px}}
+  .spec-row{{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #2a2d35;font-size:12px}}
+  .sl{{color:#aaa}}
+  .sv{{color:#fff;font-weight:500;text-align:right}}
+  .swatches{{display:flex;flex-wrap:wrap;gap:12px}}
+  .swatch{{width:48px;height:48px;border-radius:50%;border:2px solid #2a2d35;cursor:pointer;position:relative}}
+  .swatch:hover{{border-color:#fff}}
+  .sw-tip{{display:none;position:absolute;bottom:calc(100%+8px);left:50%;transform:translateX(-50%);background:#000;color:#fff;font-size:10px;padding:5px 10px;border-radius:4px;white-space:nowrap;z-index:20;text-align:center;min-width:130px;pointer-events:none}}
+  .swatch:hover .sw-tip{{display:block}}
+  .opts{{display:flex;flex-direction:column;gap:8px}}
+  .opt-item{{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#1f2229;border:1px solid #2a2d35;border-radius:6px;font-size:13px}}
+  .opt-name{{color:#fff}}
+  .opt-price{{color:#aaa;font-size:11px}}
+  .extras{{display:grid;grid-template-columns:1fr 1fr;gap:0}}
+  .cta{{text-align:center;padding:32px 0}}
+  .cta a{{display:inline-block;background:#fff;color:#171a20;padding:14px 48px;text-decoration:none;font-size:14px;letter-spacing:1px;border-radius:4px;font-weight:600}}
+  .cta a:hover{{background:#e0e0e0}}
+  .footer{{background:#171a20;border-top:1px solid #2a2d35;color:#666;text-align:center;padding:20px;font-size:11px;letter-spacing:1px}}
+</style>
+</head>
+<body>
+<div class="header">
+  <span class="tesla-wordmark">TESLA</span>
+  <a class="nav-link" href="{conf_url}" target="_blank" rel="noopener">CONFIGURE YOURS ↗</a>
+</div>
+
+<div class="hero">
+  <div class="model-tag">Tesla Configurator</div>
+  <div class="model-title">{model}</div>
+  <div class="region-badge">{region} · {currency}</div>
+</div>
+
+<div class="content">
+
+  <div>
+    <div class="section-label">Available Trims</div>
+    <div class="trim-grid">{trim_cards if trim_cards else '<p style="color:#666;font-size:13px">Trim data loading…</p>'}</div>
+  </div>
+
+  {f'''<div>
+    <div class="section-label">Exterior Colours</div>
+    <div class="swatches">{colour_swatches}</div>
+  </div>''' if colours else ''}
+
+  {f'''<div>
+    <div class="section-label">Wheel Options</div>
+    <div class="opts">{wheel_items}</div>
+  </div>''' if wheels else ''}
+
+  {f'''<div>
+    <div class="section-label">Interior</div>
+    <div class="opts">{int_items}</div>
+  </div>''' if interior else ''}
+
+  {f'''<div>
+    <div class="section-label">Additional Specifications</div>
+    <div class="extras">{extra_specs}</div>
+  </div>''' if extra_specs else ''}
+
+  <div class="cta">
+    <a href="{conf_url}" target="_blank" rel="noopener">Order / Configure on Tesla.com</a>
+  </div>
+
+</div>
+<div class="footer">Tesla, Inc. · Data sourced from Tesla configurator · {region}</div>
+</body>
+</html>"""
+
+
 # ── Attribute extraction from downloaded HTML ──────────────────────────────────
 def _extract_attrs_from_html(html: str, page: dict, specs: dict) -> dict:
     """Best-effort attribute extraction from a downloaded Tesla page."""
@@ -485,11 +660,14 @@ if __name__ == "__main__":
             # Supplement with any values extractable from the live DOM
             extra = _extract_attrs_from_html(live_html, page, specs)
             record.update({k: v for k, v in extra.items() if v and k not in record})
-        elif ss_file.exists():
-            record["screenshot_file"] = ss_file.name
-            print(f"  [PREVIEW] screenshot saved → {ss_file.name}")
         else:
-            print(f"  [WARN] No preview available for {model} ({region})")
+            # Live page unavailable — generate Tesla-styled HTML from KNOWN_SPECS
+            gen_html = _generate_tesla_html(page, specs)
+            hfile.write_text(gen_html, encoding="utf-8")
+            record["html_file"] = page["html_file"]
+            print(f"  [GENERATED] {hfile.name}  (Tesla-styled fallback, {len(gen_html):,} bytes)")
+            if ss_file.exists():
+                record["screenshot_file"] = ss_file.name
 
         indiv = OUTPUT_DIR / f"{model.replace(' ', '_')}_{region}.json"
         indiv.write_text(json.dumps(record, ensure_ascii=False, indent=4), encoding="utf-8")

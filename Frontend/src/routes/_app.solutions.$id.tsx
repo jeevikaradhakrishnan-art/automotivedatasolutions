@@ -78,7 +78,9 @@ function SolutionDetail() {
     const sorted = [...jobs].sort(
       (a, b) => (JOB_STATUS_ORDER[a.status] ?? 5) - (JOB_STATUS_ORDER[b.status] ?? 5),
     );
-    return jobFilter === "all" ? sorted : sorted.filter((j) => j.status === jobFilter);
+    return jobFilter === "all"
+      ? sorted.filter((j) => j.status !== "failed")
+      : sorted.filter((j) => j.status === jobFilter);
   }, [jobs, jobFilter]);
 
   // Map source script name → backend bot_id

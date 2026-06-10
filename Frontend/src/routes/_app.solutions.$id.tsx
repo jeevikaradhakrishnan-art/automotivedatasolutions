@@ -408,7 +408,7 @@ function SolutionDetail() {
               );
             })}
           </div>
-          <JobsTable jobs={filteredJobs} onDownload={handleDownload} onAbort={handleAbort} onSelect={(j) => setOpenJobId(j.id)} />
+          <JobsTable jobs={filteredJobs} onDownload={handleDownload} onAbort={handleAbort} onSelect={(j) => { if (j.status === "review") { setTab("review"); } else { setOpenJobId(j.id); } }} />
         </div>
       )}
 

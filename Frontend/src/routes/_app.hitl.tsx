@@ -1040,6 +1040,16 @@ function ScreenshotViewer({ item, zoom }: { item: HitlItem; zoom: number }) {
   );
 }
 
+// ── Detects Tesla records (liveUrl or recordName signals) ─────────────────────
+function isTeslaItem(item: HitlItem): boolean {
+  const url  = (item.liveUrl    ?? "").toLowerCase();
+  const name = (item.recordName ?? "").toLowerCase();
+  return url.includes("tesla.com") || name.includes("tesla") ||
+    name.includes("model y") || name.includes("model 3") ||
+    name.includes("model s") || name.includes("model x") ||
+    name.includes("cybertruck");
+}
+
 // ── Fallback HTML built from extracted RHS fields (shown when live/local HTML is inaccessible) ──
 function buildFieldsFallbackHtml(item: HitlItem): string {
   const isTesla = (item.liveUrl ?? "").includes("tesla") || (item.recordName ?? "").toLowerCase().includes("tesla") || (item.recordName ?? "").toLowerCase().includes("model y") || (item.recordName ?? "").toLowerCase().includes("cybertruck");
@@ -1104,6 +1114,194 @@ function buildFieldsFallbackHtml(item: HitlItem): string {
 </body></html>`;
 }
 
+// ── Rich Tesla configurator replica built from extracted fields ───────────────
+function buildTeslaConfiguratorHtml(item: HitlItem): string {
+  const fm: Record<string, string> = {};
+  (item.fields ?? []).forEach((fi) => { if (fi.value) fm[fi.name] = fi.value; });
+
+  const model      = fm["Model"] || fm["model"] || item.recordName?.replace(/Tesla\s*/i, "").split("—")[0].trim() || "Model";
+  const region     = fm["Region"] || fm["Country"] || fm["country"] || "";
+  const basePrice  = fm["Base price"] || fm["Cash price"] || "";
+  const currency   = fm["Currency"] || "";
+  const rangeVal   = fm["Range"] || fm["Range (converted)"] || "";
+  const accel      = fm["Acceleration"] || fm["0-60 mph"] || "";
+  const topSpeed   = fm["Top Speed"] || "";
+  const seating    = fm["Seating"] || "";
+  const cargo      = fm["Cargo"] || "";
+  const drivetrain = fm["Drivetrain"] || "";
+  const peakPower  = fm["Peak Power"] || "";
+  const colorOpts  = fm["Color options"] || "";
+  const wheelOpts  = fm["Wheel options"] || "";
+  const interiorOpts = fm["Interior options"] || "";
+  const autopilot  = fm["Autopilot"] || "";
+  const chargeTime = fm["Charge time"] || "";
+  const towing     = fm["Towing"] || "";
+  const payload    = fm["Payload"] || "";
+  const trimVariants = fm["Trim variants"] || "";
+  const priceDate  = fm["Price date"] || "";
+  const uid        = fm["UID"] || "";
+
+  const allFields     = item.fields ?? [];
+  const trimFields    = allFields.filter((f) => f.group === "trims");
+  const leaseFields   = allFields.filter((f) => f.group === "lease");
+  const financeFields = allFields.filter((f) => f.group === "finance");
+
+  const accelField = fm["Acceleration"] ? "Acceleration" : "0-60 mph";
+  const priceField = fm["Base price"]   ? "Base price"   : "Cash price";
+
+  const perfTiles = [
+    rangeVal  ? `<div class="perf-tile"><div class="perf-val" data-hitl="Range">${rangeVal}</div><div class="perf-lbl">Range</div></div>` : "",
+    accel     ? `<div class="perf-tile"><div class="perf-val" data-hitl="${accelField}">${accel}<span class="perf-unit"> s</span></div><div class="perf-lbl">0&#x2013;60 mph</div></div>` : "",
+    topSpeed  ? `<div class="perf-tile"><div class="perf-val" data-hitl="Top Speed">${topSpeed}</div><div class="perf-lbl">Top Speed</div></div>` : "",
+  ].filter(Boolean).join("");
+
+  const specRows = ([
+    ["Drivetrain",    drivetrain,  "Drivetrain"],
+    ["Peak Power",    peakPower,   "Peak Power"],
+    ["Seating",       seating,     "Seating"],
+    ["Cargo",         cargo,       "Cargo"],
+    ["Towing",        towing,      "Towing"],
+    ["Payload",       payload,     "Payload"],
+    ["Charge time",   chargeTime,  "Charge time"],
+    ["Trim variants", trimVariants,"Trim variants"],
+  ] as [string, string, string][])
+    .filter(([, v]) => v)
+    .map(([label, val, field]) => `<tr><td class="sl">${label}</td><td class="sv" data-hitl="${field}">${val}</td></tr>`)
+    .join("");
+
+  const trimsHtml = trimFields.length ? `
+    <div class="section">
+      <div class="sh">Available Trims</div>
+      <div class="trims-grid">
+        ${trimFields.map((t) => `
+          <div class="trim-card">
+            <div class="trim-name" data-hitl="${t.name}">${t.name}</div>
+            <div class="trim-detail">${t.value ?? ""}</div>
+          </div>`).join("")}
+      </div>
+    </div>` : "";
+
+  const optRows = [
+    colorOpts    ? `<tr><td class="sl">Exterior Colors</td><td class="sv" data-hitl="Color options">${colorOpts}</td></tr>` : "",
+    wheelOpts    ? `<tr><td class="sl">Wheels</td><td class="sv" data-hitl="Wheel options">${wheelOpts}</td></tr>` : "",
+    interiorOpts ? `<tr><td class="sl">Interior</td><td class="sv" data-hitl="Interior options">${interiorOpts}</td></tr>` : "",
+  ].filter(Boolean).join("");
+  const optionsHtml = optRows ? `
+    <div class="section">
+      <div class="sh">Options</div>
+      <table class="st"><tbody>${optRows}</tbody></table>
+    </div>` : "";
+
+  const leaseRows   = leaseFields.map((f) => `<tr><td class="sl">${f.name}</td><td class="sv" data-hitl="${f.name}">${f.value ?? ""}</td></tr>`).join("");
+  const financeRows = financeFields.map((f) => `<tr><td class="sl">${f.name}</td><td class="sv" data-hitl="${f.name}">${f.value ?? ""}</td></tr>`).join("");
+  const pricingRows = [
+    basePrice  ? `<tr><td class="sl">${priceField === "Base price" ? "Base Price" : "Cash Price"}</td><td class="sv pv" data-hitl="${priceField}">${currency ? `<span data-hitl="Currency">${currency}</span> ` : ""}${basePrice}</td></tr>` : "",
+    leaseRows,
+    financeRows,
+    priceDate  ? `<tr><td class="sl">Price Date</td><td class="sv" data-hitl="Price date">${priceDate}</td></tr>` : "",
+  ].filter(Boolean).join("");
+  const pricingHtml = pricingRows ? `
+    <div class="section">
+      <div class="sh">Pricing</div>
+      <table class="st"><tbody>${pricingRows}</tbody></table>
+    </div>` : "";
+
+  const featuresRows = [
+    autopilot  ? `<tr><td class="sl">Autopilot</td><td class="sv" data-hitl="Autopilot">${autopilot}</td></tr>` : "",
+  ].filter(Boolean).join("");
+  const featuresHtml = featuresRows ? `
+    <div class="section">
+      <div class="sh">Features</div>
+      <table class="st"><tbody>${featuresRows}</tbody></table>
+    </div>` : "";
+
+  const hiddenFields = allFields
+    .filter((f) => f.value)
+    .map((f) => `<span data-hitl="${f.name}" style="display:none">${f.value}</span>`)
+    .join("");
+
+  const liveLinkHtml = item.liveUrl
+    ? `<div style="text-align:center;padding:24px 0"><a href="${item.liveUrl}" target="_blank" rel="noopener" style="color:#e31937;font-size:11px;letter-spacing:3px;text-decoration:none">VIEW ON TESLA.COM &#x2197;</a></div>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tesla ${model}${region ? " — " + region : ""} · Configurator</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;background:#171a20;color:#fff;min-height:100vh}
+a{color:#e31937;text-decoration:none}
+.tnav{background:#000;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+.tlogo{font-size:15px;font-weight:700;letter-spacing:6px;color:#fff}
+.tnav-links{display:flex;gap:20px;font-size:12px;opacity:.7}
+.hero{background:linear-gradient(160deg,#0a0a0a 0%,#111318 50%,#0e1018 100%);padding:48px 24px 32px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 25%,rgba(227,25,55,.07),transparent 60%)}
+.hero-ey{font-size:10px;letter-spacing:4px;color:#888;text-transform:uppercase;margin-bottom:10px}
+.hero-model{font-size:54px;font-weight:200;letter-spacing:-1px;line-height:1;position:relative}
+.hero-sub{font-size:13px;color:#888;margin-top:6px}
+.hero-price{font-size:20px;font-weight:500;margin-top:12px}
+.hero-price .hp-val{color:#e31937}
+.order-btn{display:inline-block;margin-top:20px;background:#e31937;color:#fff;font-size:13px;font-weight:600;padding:12px 40px;border-radius:4px;letter-spacing:1px;cursor:pointer}
+.car-svg{display:block;margin:24px auto 0;width:68%;opacity:.18}
+.ps{display:flex;justify-content:center;background:#1b1f27;border-top:1px solid #2a2d35;border-bottom:1px solid #2a2d35}
+.perf-tile{flex:1;text-align:center;padding:22px 10px;border-right:1px solid #2a2d35}
+.perf-tile:last-child{border-right:none}
+.perf-val{font-size:28px;font-weight:300;letter-spacing:-.5px}
+.perf-unit{font-size:14px;opacity:.7}
+.perf-lbl{font-size:10px;letter-spacing:2px;color:#777;text-transform:uppercase;margin-top:5px}
+.content{max-width:800px;margin:0 auto;padding:0 24px 48px}
+.section{margin-top:32px}
+.sh{font-size:10px;letter-spacing:4px;text-transform:uppercase;color:#e31937;padding-bottom:8px;border-bottom:1px solid #2a2d35;margin-bottom:12px}
+.st{width:100%;border-collapse:collapse}
+.sl{padding:9px 0;font-size:13px;color:#777;width:48%;border-bottom:1px solid #1e2028}
+.sv{padding:9px 0;font-size:13px;font-weight:500;border-bottom:1px solid #1e2028;text-align:right}
+.pv{font-size:17px}
+.trims-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.trim-card{background:#1f2229;border:1px solid #2a2d35;border-radius:6px;padding:14px 16px}
+.trim-name{font-size:14px;font-weight:600;margin-bottom:4px}
+.trim-detail{font-size:11px;color:#777;line-height:1.6}
+.footer{text-align:center;padding:32px 24px;border-top:1px solid #1e2028;color:#3a3d45;font-size:10px;margin-top:32px}
+</style>
+</head>
+<body>
+<nav class="tnav">
+  <div class="tlogo" data-hitl="Brand">TESLA</div>
+  <div class="tnav-links"><span>Models</span><span>Charging</span><span>Discover</span><span>Shop</span></div>
+  <div style="font-size:11px;opacity:.4">Sign In</div>
+</nav>
+<div class="hero">
+  <div class="hero-ey">TESLA${region ? ' &middot; <span data-hitl="Region">' + region + '</span>' : " CONFIGURATOR"}</div>
+  <div class="hero-model" data-hitl="Model">${model}</div>
+  ${fm["trim"] ? `<div class="hero-sub" data-hitl="trim">${fm["trim"]}</div>` : ""}
+  ${basePrice ? `<div class="hero-price">From <span class="hp-val" data-hitl="${priceField}">${currency ? '<span data-hitl="Currency">' + currency + '</span> ' : ""}${basePrice}</span></div>` : ""}
+  <div class="order-btn">Order Now</div>
+  <svg class="car-svg" viewBox="0 0 500 100">
+    <path d="M30 75 Q80 30 180 28 L290 28 Q380 28 430 65 L470 70 Q480 70 480 80 L30 80 Z" fill="#fff"/>
+    <circle cx="140" cy="80" r="16" fill="#000"/><circle cx="140" cy="80" r="8" fill="#555"/>
+    <circle cx="370" cy="80" r="16" fill="#000"/><circle cx="370" cy="80" r="8" fill="#555"/>
+    <rect x="185" y="36" width="100" height="18" rx="3" fill="rgba(255,255,255,.45)"/>
+  </svg>
+</div>
+${perfTiles ? `<div class="ps">${perfTiles}</div>` : ""}
+<div class="content">
+  ${specRows ? `<div class="section"><div class="sh">Specifications</div><table class="st"><tbody>${specRows}</tbody></table></div>` : ""}
+  ${optionsHtml}
+  ${trimsHtml}
+  ${pricingHtml}
+  ${featuresHtml}
+  ${liveLinkHtml}
+</div>
+<div class="footer">
+  &copy; ${new Date().getFullYear()} Tesla, Inc. &nbsp;&middot;&nbsp; Data captured for HITL review &nbsp;&middot;&nbsp; <span data-hitl="UID">${uid}</span>
+</div>
+<div style="display:none">${hiddenFields}</div>
+</body>
+</html>`;
+}
+
 // ── Bot HTML viewer: fetches, injects annotation layer, renders via srcdoc ───
 function BotHtmlViewer({
   item, allFields, selectedField, onIframe,
@@ -1120,11 +1318,16 @@ function BotHtmlViewer({
   // Pass iframe element up so parent can postMessage to it
   useEffect(() => { onIframe(iframeRef.current); }, [loaded]); // eslint-disable-line
 
-  // Fetch + inject on item change — prefer local HTML file, fall back to proxy
+  // Fetch + inject on item change — prefer local HTML file; for Tesla use replica; fall back to proxy
   useEffect(() => {
     setLoaded(false);
     setSrcdoc("");
     const isLocal = item.htmlFile && !item.htmlFile.startsWith("http");
+    // Tesla items: build rich configurator replica locally — never proxy live Tesla URLs
+    if (!isLocal && isTeslaItem(item)) {
+      setSrcdoc(injectAnnotationLayer(buildTeslaConfiguratorHtml(item)));
+      return;
+    }
     const sourceUrl = isLocal
       ? `${BOT_API}/api/html/${encodeURIComponent(item.htmlFile!)}`
       : item.liveUrl
@@ -1161,6 +1364,8 @@ function BotHtmlViewer({
         <Globe className="size-3" />
         {item.htmlFile && !item.htmlFile.startsWith("http") ? (
           <span className="truncate text-amber">Local HTML: {item.htmlFile}</span>
+        ) : isTeslaItem(item) ? (
+          <span className="truncate text-amber">Configurator Replica · {item.recordName}</span>
         ) : (
           <span className="truncate">{item.liveUrl}</span>
         )}

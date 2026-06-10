@@ -1,9 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 
 const BOT_API = typeof window !== "undefined"
   ? ""
   : "http://localhost:8001";
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback, memo } from "react";
 import {
   Check, X, ClipboardCheck, Filter, FileText, Globe, Camera,
   ChevronLeft, ChevronRight, Info, Search, SkipForward, ArrowRight, Layers, Lock,
@@ -42,8 +42,25 @@ function HitlPage() {
     const map = new Map<string, { job: Job; items: HitlItem[]; previewKind: "html" | "pdf" | "screenshot" }>();
     hitl.forEach((h) => {
       if (!h.jobId) return;
-      const job = jobs.find((j) => j.id === h.jobId);
-      if (!job) return;
+      const found = jobs.find((j) => j.id === h.jobId);
+      // If job no longer in store (e.g. seed hitl with legacy job IDs), create a placeholder so items remain reviewable
+      const job: Job = found ?? {
+        id: h.jobId,
+        solutionId: h.solutionId ?? "unknown",
+        source: h.workflow ?? "Archived job",
+        workflow: h.workflow ?? "—",
+        status: "review" as const,
+        startedAt: h.createdAt ?? new Date().toISOString(),
+        finishedAt: h.createdAt,
+        format: "CSV" as const,
+        rowsProduced: 0,
+        reviewTotal: 0,
+        reviewApproved: 0,
+        reviewRejected: 0,
+        runtimeMs: 0,
+        mode: "delta" as const,
+        steps: [],
+      };
       const cur = map.get(h.jobId) ?? { job, items: [], previewKind: h.previewKind ?? "html" };
       cur.items.push(h);
       map.set(h.jobId, cur);
@@ -240,6 +257,7 @@ function ValidationScreen({
 }) {
   const sol = getSolution(job.solutionId);
   void sol;
+  const navigate = useNavigate();
   const [idx, setIdx] = useState<number>(() => {
     const firstPending = items.findIndex((i) => i.status === "pending");
     return firstPending === -1 ? 0 : firstPending;
@@ -405,7 +423,10 @@ function ValidationScreen({
     <div className="flex flex-col h-full bg-gradient-to-br from-surface/40 via-background to-surface/20 relative">
       {/* Sticky top toolbar */}
       <div className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur-xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
-        <button onClick={onBack} className="h-8 px-2.5 rounded-md text-[11px] font-mono border border-border hover:border-cyan/40 hover:bg-cyan/5 flex items-center gap-1 transition">
+        <button
+          onClick={() => navigate({ to: "/solutions/$id", params: { id: job.solutionId }, search: { tab: "review" } as Record<string, string> })}
+          className="h-8 px-2.5 rounded-md text-[11px] font-mono border border-border hover:border-cyan/40 hover:bg-cyan/5 flex items-center gap-1 transition"
+        >
           <ChevronLeft className="size-3" /> BATCHES
         </button>
         <div className="flex items-center gap-2 text-[11px] font-mono">
@@ -486,13 +507,14 @@ function ValidationScreen({
             className="flex-1 overflow-y-auto bg-[linear-gradient(135deg,oklch(0.96_0.005_220),oklch(0.97_0.008_180))] p-4 relative"
             ref={lhsRef}
             onContextMenu={(e) => {
-              const sel = window.getSelection?.();
-              const text = sel?.toString().trim() ?? "";
-              const isScreenshot = !!(item.screenshotFile && !item.htmlFile);
-              if (!text && !isScreenshot) return;
               e.preventDefault();
+              const sel = window.getSelection?.();
+              const selectedText = sel?.toString().trim() ?? "";
+              // Fallback: use the clicked element's text content if nothing is selected
+              const clickedText = (e.target as HTMLElement).textContent?.trim() ?? "";
+              const text = selectedText || clickedText;
               setCtxQuery("");
-              setCtxMenu({ x: e.clientX, y: e.clientY, text, editable: isScreenshot && !text });
+              setCtxMenu({ x: e.clientX, y: e.clientY, text, editable: !text });
             }}
           >
             <div style={{ zoom: (item.liveUrl || item.htmlFile || item.screenshotFile) ? undefined : `${zoom}%` }} className="transition-all">
@@ -1045,6 +1067,70 @@ function ScreenshotViewer({ item, zoom }: { item: HitlItem; zoom: number }) {
   );
 }
 
+// ── Fallback HTML built from extracted RHS fields (shown when live/local HTML is inaccessible) ──
+function buildFieldsFallbackHtml(item: HitlItem): string {
+  const isTesla = (item.liveUrl ?? "").includes("tesla") || (item.recordName ?? "").toLowerCase().includes("tesla") || (item.recordName ?? "").toLowerCase().includes("model y") || (item.recordName ?? "").toLowerCase().includes("cybertruck");
+  const bg = isTesla ? "#171a20" : "#f8f9fa";
+  const fg = isTesla ? "#fff" : "#111";
+  const cardBg = isTesla ? "#1f2229" : "#fff";
+  const borderColor = isTesla ? "#2a2d35" : "#dee2e6";
+  const accent = isTesla ? "#e31937" : "#1c69d4";
+  const mutedColor = isTesla ? "#aaa" : "#666";
+  const groupBg = isTesla ? "#242830" : "#f0f4ff";
+  const warnBg = isTesla ? "#2a2500" : "#fff3cd";
+  const warnBorder = isTesla ? "#555" : "#ffc107";
+  const warnFg = isTesla ? "#f59e0b" : "#856404";
+
+  const groups: Record<string, typeof item.fields> = {};
+  (item.fields ?? []).forEach((f) => {
+    const g = f.group ?? "fields";
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(f);
+  });
+
+  let sectionsHtml = "";
+  for (const [grp, fields] of Object.entries(groups)) {
+    const rows = fields.map((f) => {
+      const conf = f.confidence ?? 0;
+      const confColor = conf >= 90 ? "#22c55e" : conf >= 75 ? "#f59e0b" : "#ef4444";
+      return `<tr>
+        <td style="padding:7px 12px;color:${mutedColor};font-size:12px;border-bottom:1px solid ${borderColor};white-space:nowrap">${f.name}</td>
+        <td style="padding:7px 12px;font-size:13px;font-weight:500;border-bottom:1px solid ${borderColor};color:${fg}">${f.value || "—"}</td>
+        <td style="padding:7px 12px;font-size:10px;color:${confColor};border-bottom:1px solid ${borderColor};text-align:right;font-family:monospace">${conf}%</td>
+      </tr>`;
+    }).join("");
+    sectionsHtml += `<div style="margin-bottom:18px">
+      <div style="font-size:10px;letter-spacing:3px;color:${accent};text-transform:uppercase;padding:7px 12px;background:${groupBg};border-radius:4px 4px 0 0;border:1px solid ${borderColor};border-bottom:none">${grp}</div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid ${borderColor};border-radius:0 0 4px 4px;background:${cardBg}"><tbody>${rows}</tbody></table>
+    </div>`;
+  }
+
+  const liveLink = item.liveUrl
+    ? `<a href="${item.liveUrl}" target="_blank" rel="noopener" style="color:${accent};margin-left:10px;font-size:11px">Open Live ↗</a>`
+    : "";
+
+  const brandLabel = isTesla ? "TESLA" : (item.recordName?.split(" ")[0]?.toUpperCase() ?? "SOURCE");
+
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${item.recordName ?? "Record"}</title>
+<style>body{margin:0;padding:20px;font-family:${isTesla ? "'Gotham','Helvetica Neue'," : ""}Arial,sans-serif;background:${bg};color:${fg}}*{box-sizing:border-box}</style>
+</head><body>
+<div style="max-width:740px;margin:0 auto">
+  <div style="background:${isTesla ? "#000" : accent};color:#fff;padding:12px 20px;border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:space-between">
+    <span style="font-weight:700;font-size:14px;letter-spacing:${isTesla ? "5px" : "1px"}">${brandLabel}</span>
+    <span style="font-size:11px;opacity:0.7">${item.recordName ?? ""}</span>
+  </div>
+  <div style="border:1px solid ${borderColor};border-top:none;border-radius:0 0 6px 6px;padding:16px;background:${cardBg}">
+    <div style="margin-bottom:16px;padding:9px 12px;background:${warnBg};border:1px solid ${warnBorder};border-radius:4px;color:${warnFg};font-size:11px">
+      ⚠ Live page not available — showing extracted data from AI analysis${liveLink}
+    </div>
+    ${sectionsHtml || '<p style="color:' + mutedColor + ';font-size:13px">No field data available.</p>'}
+  </div>
+</div>
+</body></html>`;
+}
+
 // ── Bot HTML viewer: fetches, injects annotation layer, renders via srcdoc ───
 function BotHtmlViewer({
   item, allFields, selectedField, onIframe,
@@ -1073,9 +1159,12 @@ function BotHtmlViewer({
         : null;
     if (!sourceUrl) return;
     fetch(sourceUrl)
-      .then((r) => r.text())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.text();
+      })
       .then((html) => setSrcdoc(injectAnnotationLayer(html)))
-      .catch(() => setSrcdoc(`<html><body style="font-family:sans-serif;padding:20px;color:#666"><p>Could not load source page.</p></body></html>`));
+      .catch(() => setSrcdoc(injectAnnotationLayer(buildFieldsFallbackHtml(item))));
   }, [item.htmlFile, item.liveUrl, item.id]);
 
   // Send highlights when iframe is ready or fields change
@@ -1134,6 +1223,11 @@ function BotHtmlViewer({
     </div>
   );
 }
+
+// Memo-wrapped versions: custom equality keyed on item.id so text-walker DOM
+// marks survive re-renders triggered by selectedField / other parent state changes.
+const MemoRealisticHtml = memo(RealisticHtml,  (p, n) => p.item.id === n.item.id && p.solutionId === n.solutionId);
+const MemoRealisticPdf  = memo(RealisticPdf,   (p, n) => p.item.id === n.item.id && p.solutionId === n.solutionId);
 
 // ── Wraps the synthetic source renderer with field-highlight overlay ──────────
 function SourceWithHighlights({
@@ -1200,8 +1294,8 @@ function SourceWithHighlights({
   return (
     <div ref={wrapRef} className={`transition ${matchesSearch ? "" : "opacity-40"}`}>
       {view === "pdf"
-        ? <RealisticPdf solutionId={solutionId} item={item} />
-        : <RealisticHtml solutionId={solutionId} item={item} />}
+        ? <MemoRealisticPdf solutionId={solutionId} item={item} />
+        : <MemoRealisticHtml solutionId={solutionId} item={item} />}
     </div>
   );
 }
@@ -1242,8 +1336,6 @@ function timeAgo(iso: string) {
   return `${Math.floor(m / 60)}h ago`;
 }
 
-// Suppress unused import warning until Link is used elsewhere
-void Link;
 
 // ===================== Realistic source previews =====================
 

@@ -1595,6 +1595,7 @@ function OemConfiguratorPage({ f, item }: { f: Record<string, string>; item: Hit
             ["Battery", "battery_kwh", `${f.battery_kwh || "81.5"} kWh`],
             ["Range (EPA est.)", "range_mi", `${f.range_mi || "307"} mi`],
             ["0–60 mph", "zero_to_sixty_s", `${f.zero_to_sixty_s || "4.6"} s`],
+            ["Body length", "length_in", `${f.length_in || "—"} in`],
             ["Exterior color", "color", f.color || "Frozen Pure Grey Metallic"],
             ["Interior", "interior", f.interior || "Veganza Mocha"],
             ["Wheels", "wheels", f.wheels || '20" M Aerodynamic Bicolour'],
@@ -1652,12 +1653,12 @@ function VehicleSpecSheetPdf({ f, item }: { f: Record<string, string>; item: Hit
       {/* Brochure cover band */}
       <div className="relative h-[34%] text-white p-6 flex flex-col" style={{ background: `linear-gradient(135deg, ${brandColor}, #111)` }}>
         <div className="flex items-center justify-between">
-          <div className="text-[9px] tracking-[0.35em] opacity-80">{oem.toUpperCase()} · PRODUCT BROCHURE</div>
+          <div className="text-[9px] tracking-[0.35em] opacity-80"><span data-field="oem">{oem.toUpperCase()}</span> · PRODUCT BROCHURE</div>
           <div className="text-[9px] tracking-[0.2em] opacity-80">MY{new Date().getFullYear()}</div>
         </div>
         <div className="mt-auto">
-          <div className="text-5xl font-light leading-none">{model}</div>
-          <div className="text-base mt-1 opacity-90">{trim}</div>
+          <div data-field="model" className="text-5xl font-light leading-none">{model}</div>
+          <div data-field="trim" className="text-base mt-1 opacity-90">{trim}</div>
           <div className="text-[10px] mt-2 opacity-70 italic">Engineered for the way you drive.</div>
         </div>
         {/* car silhouette */}

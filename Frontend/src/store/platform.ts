@@ -594,7 +594,7 @@ export const usePlatform = create<PlatformState>()(
       },
     }),
     {
-      name: "xdas-platform-v11",
+      name: "xdas-platform-v12",
       storage: createJSONStorage(() =>
         typeof window !== "undefined"
           ? window.localStorage

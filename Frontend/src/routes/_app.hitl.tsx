@@ -1262,6 +1262,28 @@ function SourceWithHighlights({
     });
   }, [selectedField]);
 
+  // Highlight non-mark data-field elements (styled template elements + FieldsReference)
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    wrapRef.current.querySelectorAll<HTMLElement>("[data-field]:not(.hitl-mark)").forEach((el) => {
+      el.style.removeProperty("background");
+      el.style.removeProperty("outline");
+      el.style.removeProperty("outline-offset");
+      el.style.removeProperty("box-shadow");
+      el.style.removeProperty("border-radius");
+    });
+    if (selectedField) {
+      const el = wrapRef.current.querySelector<HTMLElement>(`[data-field="${CSS.escape(selectedField)}"]:not(.hitl-mark)`);
+      if (el) {
+        el.style.background = "rgba(34,197,94,0.25)";
+        el.style.outline = "2px solid rgba(34,197,94,0.85)";
+        el.style.outlineOffset = "2px";
+        el.style.boxShadow = "0 0 0 4px rgba(34,197,94,0.18)";
+        el.style.borderRadius = "3px";
+      }
+    }
+  }, [selectedField]);
+
   const matchesSearch = !search || JSON.stringify(item).toLowerCase().includes(search.toLowerCase());
 
   return (

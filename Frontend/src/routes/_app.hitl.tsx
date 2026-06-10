@@ -10,7 +10,7 @@ import {
   ZoomIn, ZoomOut, Languages, Plus, MessageSquare, Sparkles, Keyboard,
   Activity, Gauge, ChevronDown, MapPin, Save, Circle, MousePointerClick,
 } from "lucide-react";
-import { usePlatform, type HitlItem, type HitlStatus, type Job } from "@/store/platform";
+import { usePlatform, type HitlItem, type HitlField, type HitlStatus, type Job } from "@/store/platform";
 import { SOLUTIONS, getSolution } from "@/data/solutions";
 
 type HitlSearch = { sol?: string; job?: string };
@@ -1054,7 +1054,7 @@ function buildFieldsFallbackHtml(item: HitlItem): string {
   const warnBorder = isTesla ? "#555" : "#ffc107";
   const warnFg = isTesla ? "#f59e0b" : "#856404";
 
-  const groups: Record<string, typeof item.fields> = {};
+  const groups: Record<string, HitlField[]> = {};
   (item.fields ?? []).forEach((f) => {
     const g = f.group ?? "fields";
     if (!groups[g]) groups[g] = [];
@@ -1344,7 +1344,7 @@ function VehicleBrandPage({ f, item }: { f: Record<string, string>; item: HitlIt
     <div className="bg-white text-neutral-900 shadow-xl rounded overflow-hidden mx-auto max-w-[640px]">
       {/* top nav */}
       <div className="bg-black text-white text-[11px] px-4 h-9 flex items-center gap-4">
-        <span className="font-bold tracking-widest">{oem.toUpperCase()}</span>
+        <span data-field="oem" className="font-bold tracking-widest">{oem.toUpperCase()}</span>
         <span className="opacity-70">Models</span>
         <span className="opacity-70">Build</span>
         <span className="opacity-70">Shop</span>
@@ -1354,8 +1354,8 @@ function VehicleBrandPage({ f, item }: { f: Record<string, string>; item: HitlIt
       {/* hero */}
       <div className="relative h-44 bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-900 text-white p-5 flex flex-col justify-end">
         <div className="text-[10px] tracking-widest opacity-80">{new Date().getFullYear()} {oem.toUpperCase()}</div>
-        <div className="text-3xl font-light leading-none mt-1">{model}</div>
-        <div className="text-sm opacity-90 mt-1">{trim} · Starting at {msrp}</div>
+        <div data-field="model" className="text-3xl font-light leading-none mt-1">{model}</div>
+        <div className="text-sm opacity-90 mt-1"><span data-field="trim">{trim}</span> · Starting at <span data-field="msrp">{msrp}</span></div>
         <div className="absolute right-5 bottom-5 flex gap-2">
           <button className="text-[10px] bg-white text-black px-3 py-1.5 rounded">Build Yours</button>
           <button className="text-[10px] border border-white px-3 py-1.5 rounded">Test Drive</button>
@@ -1430,15 +1430,19 @@ function NewsArticlePage({ f, item }: { f: Record<string, string>; item: HitlIte
         <span>World</span><span>Markets</span><span className="text-black font-semibold">Autos</span><span>Tech</span><span>Sustainability</span>
       </div>
       <div className="p-5 space-y-4">
-        <div className="text-[10px] tracking-widest text-neutral-500">AUTOMOTIVE · {new Date().toDateString()}</div>
-        <h1 className="text-2xl font-serif font-bold leading-tight">{item.summary}</h1>
-        <div className="text-[11px] text-neutral-500 flex gap-3 border-b pb-3 flex-wrap">
-          <span>By Reuters Staff</span><span>·</span><span>4 min read</span><span>·</span>
+        <div data-field="published_at" className="text-[10px] tracking-widest text-neutral-500">AUTOMOTIVE · {f.published_at || new Date().toDateString()}</div>
+        <h1 data-field="headline" className="text-2xl font-serif font-bold leading-tight">{item.summary}</h1>
+        <div className="text-[11px] text-neutral-500 flex gap-3 border-b pb-3 flex-wrap items-center">
+          <span data-field="publisher">{f.publisher || "Reuters Staff"}</span><span>·</span><span>4 min read</span><span>·</span>
           <span data-field="cluster">{f.cluster || "EV Supply"}</span>
-          {f.sentiment && <span>·</span>}
-          {f.sentiment && <span data-field="sentiment" className="px-1.5 py-0.5 rounded text-[10px] bg-green-100 text-green-800 font-medium">{f.sentiment}</span>}
-          {f.impact && <span>·</span>}
-          {f.impact && <span data-field="impact" className="px-1.5 py-0.5 rounded text-[10px] bg-orange-100 text-orange-800 font-medium">{f.impact}</span>}
+          <span>·</span>
+          <span data-field="sentiment" className={f.sentiment ? "px-1.5 py-0.5 rounded text-[10px] bg-green-100 text-green-800 font-medium" : "text-neutral-400 text-[10px]"}>{f.sentiment || "—"}</span>
+          <span>·</span>
+          <span data-field="impact" className={f.impact ? "px-1.5 py-0.5 rounded text-[10px] bg-orange-100 text-orange-800 font-medium" : "text-neutral-400 text-[10px]"}>{f.impact || "—"}</span>
+        </div>
+        <div className="flex gap-4 flex-wrap text-[11px] text-neutral-500 pb-1 border-b">
+          <span>OEM: <span data-field="primary_oem" className="font-medium text-neutral-800">{f.primary_oem || "—"}</span></span>
+          <span>Region: <span data-field="region" className="font-medium text-neutral-800">{f.region || "—"}</span></span>
         </div>
         <div className="h-40 bg-gradient-to-br from-neutral-300 to-neutral-500 rounded grid place-items-center text-white text-xs italic">[ wire photo ]</div>
         <p className="text-[13px] leading-relaxed text-neutral-800 font-serif">
@@ -1537,7 +1541,7 @@ function OemConfiguratorPage({ f, item }: { f: Record<string, string>; item: Hit
     <div className="bg-white text-neutral-900 shadow-2xl rounded overflow-hidden mx-auto max-w-[680px] border border-neutral-200">
       {/* OEM top nav bar */}
       <div className="h-11 flex items-center px-5 text-[12px]" style={{ background: palette.nav, color: palette.nav === "#fff" ? "#000" : "#fff" }}>
-        <span className="font-black tracking-[0.2em] text-[14px]">{palette.brand}</span>
+        <span data-field="oem" className="font-black tracking-[0.2em] text-[14px]">{palette.brand}</span>
         <nav className="flex gap-5 ml-8 opacity-80">
           <span>Models</span><span className="font-semibold underline underline-offset-4">Build Your Own</span>
           <span>Shopping Tools</span><span>Owners</span>
@@ -1555,8 +1559,8 @@ function OemConfiguratorPage({ f, item }: { f: Record<string, string>; item: Hit
         </div>
         <div className="relative">
           <div className="text-[10px] tracking-[0.25em] opacity-80">{new Date().getFullYear()} · {palette.brand} CONFIGURATOR</div>
-          <div className="text-3xl font-light leading-none mt-2">{model}</div>
-          <div className="text-sm opacity-90 mt-1">{trim} · from <span className="font-semibold">{msrp}</span></div>
+          <div data-field="model" className="text-3xl font-light leading-none mt-2">{model}</div>
+          <div className="text-sm opacity-90 mt-1"><span data-field="trim">{trim}</span> · from <span data-field="msrp" className="font-semibold">{msrp}</span></div>
         </div>
         {/* car silhouette */}
         <svg viewBox="0 0 400 80" className="absolute left-1/2 -translate-x-1/2 bottom-2 w-[70%] opacity-40">
@@ -1784,12 +1788,12 @@ function PlantDataSheetPdf({ f, item }: { f: Record<string, string>; item: HitlI
         </div>
         <div>
           <SectionTitle>OPERATIONS</SectionTitle>
-          <PdfRow k="Production site" v="Yes" />
+          <PdfRow k="Site type" v={f.site_type || "Manufacturing"} field="site_type" />
+          <PdfRow k="Headcount" v={f.headcount || "—"} field="headcount" />
+          <PdfRow k="Annual capacity" v={f.annual_capacity || "—"} field="annual_capacity" />
           <PdfRow k="Primary segment" v="Driveline systems" />
-          <PdfRow k="Headcount" v="~9,200" />
           <PdfRow k="Year established" v="1915" />
           <PdfRow k="Certifications" v="IATF 16949, ISO 14001" />
-          <PdfRow k="Customer of record" v="VW Group, BMW, Daimler Truck" />
         </div>
       </div>
 

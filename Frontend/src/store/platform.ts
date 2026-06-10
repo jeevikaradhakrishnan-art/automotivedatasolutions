@@ -139,8 +139,8 @@ const PLANT_FIELDS = (name: string): HitlField[] => [
   { group: "operations", name: "headcount", value: "2,400", confidence: 70 },
   { group: "operations", name: "annual_capacity", value: "", confidence: 64 },
 ];
-const NEWS_FIELDS: HitlField[] = [
-  { group: "article", name: "headline", value: "BYD secures lithium supply deal in Atacama", confidence: 100 },
+const NEWS_FIELDS = (headline: string): HitlField[] => [
+  { group: "article", name: "headline", value: headline, confidence: 100 },
   { group: "article", name: "publisher", value: "Reuters Autos", confidence: 100 },
   { group: "article", name: "published_at", value: "2025-05-21T08:14Z", confidence: 100 },
   { group: "classification", name: "cluster", value: "EV Supply Chain", confidence: 81 },
@@ -148,6 +148,25 @@ const NEWS_FIELDS: HitlField[] = [
   { group: "classification", name: "impact", value: "", confidence: 78 },
   { group: "entities", name: "primary_oem", value: "BYD", confidence: 100 },
   { group: "entities", name: "region", value: "South America", confidence: 95 },
+];
+const EV_STATION_FIELDS = (name: string, city: string, state: string): HitlField[] => [
+  { group: "location", name: "station_name", value: name, confidence: 100 },
+  { group: "location", name: "city", value: city, confidence: 100 },
+  { group: "location", name: "state", value: state, confidence: 95 },
+  { group: "network", name: "network", value: "ChargePoint", confidence: 92 },
+  { group: "specs", name: "type", value: "DC Fast", confidence: 88 },
+  { group: "specs", name: "power", value: "150 kW", confidence: 82 },
+  { group: "specs", name: "pricing", value: "", confidence: 70 },
+  { group: "specs", name: "availability", value: "", confidence: 65 },
+];
+const DEALER_FIELDS = (dealer: string, city: string, oem: string): HitlField[] => [
+  { group: "dealer", name: "dealer", value: dealer, confidence: 100 },
+  { group: "dealer", name: "city", value: city, confidence: 100 },
+  { group: "dealer", name: "oem", value: oem, confidence: 95 },
+  { group: "metrics", name: "inventory", value: "47 units", confidence: 88 },
+  { group: "metrics", name: "avg_dol", value: "28", confidence: 75 },
+  { group: "metrics", name: "velocity", value: "", confidence: 65 },
+  { group: "metrics", name: "insight", value: "", confidence: 60 },
 ];
 // ---- Seeded jobs (a couple already reviewed, one pending review with HITL batch) ----
 
@@ -397,7 +416,109 @@ const seedJobs = (): Job[] => [
   },
 ];
 
-const seedHitl = (): HitlItem[] => [];
+const seedHitl = (): HitlItem[] => {
+  const items: HitlItem[] = [];
+
+  // ── OEM Configurator (oem-config) ──────────────────────────────────────
+  [
+    { oem: "BMW",   model: "iX1",      trim: "xDrive30 M Sport", msrp: "$52,900" },
+    { oem: "Tesla", model: "Model Y",  trim: "Long Range AWD",   msrp: "$44,990" },
+    { oem: "Audi",  model: "Q4 e-tron",trim: "40 Premium",       msrp: "$48,400" },
+  ].forEach((m, i) => items.push({
+    id: `h-oem-${i}`, solutionId: "oem-config", jobId: `j-seed-oem`,
+    workflow: "OEM Configurator · Build & Price",
+    recordName: `${m.oem} ${m.model} · ${m.trim}`,
+    summary:    `${m.oem} ${m.model} ${m.trim}`,
+    detail:     "Verify trim, MSRP and powertrain attributes against OEM configurator.",
+    field: "trim", proposed: m.trim, current: "—",
+    fields: VEHICLE_FIELDS(m.oem, m.model, m.trim, m.msrp),
+    confidence: 84 - i * 4, status: "pending",
+    createdAt: new Date(Date.now() - 1000 * 60 * (20 + i * 3)).toISOString(), previewKind: "html",
+  }));
+
+  // ── Vehicle Spec (vehicle-spec) ─────────────────────────────────────────
+  [
+    { oem: "Ford",  model: "Mustang Mach-E",  trim: "Rally GT Performance", msrp: "$64,995" },
+    { oem: "Ford",  model: "F-150 Lightning", trim: "Platinum",             msrp: "$84,995" },
+    { oem: "BMW",   model: "i5",              trim: "eDrive40",             msrp: "$66,800" },
+  ].forEach((m, i) => items.push({
+    id: `h-veh-${i}`, solutionId: "vehicle-spec", jobId: `j-seed-veh`,
+    workflow: "OEM Catalog · Weekly Crawl",
+    recordName: `${m.model} · ${m.trim}`,
+    summary:    `${m.model} ${m.trim}`,
+    detail:     "Verify MSRP and powertrain mapping against customer template.",
+    field: "msrp", proposed: m.msrp, current: "—",
+    fields: VEHICLE_FIELDS(m.oem, m.model, m.trim, m.msrp),
+    confidence: 78 - i * 3, status: "pending",
+    createdAt: new Date(Date.now() - 1000 * 60 * (15 + i * 2)).toISOString(), previewKind: i === 1 ? "pdf" : "html",
+  }));
+
+  // ── News (news) ─────────────────────────────────────────────────────────
+  [
+    "BYD secures lithium supply deal in Atacama",
+    "Toyota patent splits V2G / V2X classification",
+    "GM Cruise restarts limited autonomy pilot",
+  ].forEach((h, i) => items.push({
+    id: `h-news-${i}`, solutionId: "news", jobId: `j-seed-news`,
+    workflow: "News · Continuous",
+    recordName: h, summary: h,
+    detail: "Verify clustering, sentiment and impact classification before shipping insight.",
+    field: "cluster", proposed: "EV Supply Chain", current: "Lithium",
+    fields: NEWS_FIELDS(h),
+    confidence: 81 - i * 5, status: "pending",
+    createdAt: new Date(Date.now() - 1000 * 60 * (25 + i)).toISOString(), previewKind: "html",
+  }));
+
+  // ── Plants (plants) ─────────────────────────────────────────────────────
+  [
+    { name: "ZF Friedrichshafen Plant 1", city: "Friedrichshafen", country: "Germany" },
+    { name: "ZF Saarbrücken",             city: "Saarbrücken",     country: "Germany" },
+    { name: "ZF Lebanon TN",              city: "Lebanon",         country: "USA"    },
+  ].forEach((p, i) => items.push({
+    id: `h-plant-${i}`, solutionId: "plants", jobId: `j-seed-plant`,
+    workflow: "Plants · Full Refresh",
+    recordName: p.name, summary: p.name,
+    detail: "Verify supplier-group normalization and geocoding accuracy.",
+    field: "supplier_group", proposed: "ZF Friedrichshafen AG", current: "ZF Group",
+    fields: PLANT_FIELDS(p.name),
+    confidence: 70 - i * 2, status: "pending",
+    createdAt: new Date(Date.now() - 1000 * 60 * (10 + i * 2)).toISOString(), previewKind: "pdf",
+  }));
+
+  // ── EV Charging (ev-charging) ────────────────────────────────────────────
+  [
+    { name: "Fremont Supercharger Hub",     city: "Fremont",  state: "CA" },
+    { name: "Oakland ChargePoint Center",   city: "Oakland",  state: "CA" },
+    { name: "San Jose EVGO Station",        city: "San Jose", state: "CA" },
+  ].forEach((s, i) => items.push({
+    id: `h-ev-${i}`, solutionId: "ev-charging", jobId: `j-seed-ev`,
+    workflow: "EV Station · Network Sync",
+    recordName: s.name, summary: s.name,
+    detail: "Verify station specifications and pricing details from network API.",
+    field: "pricing", proposed: "$0.43/kWh", current: "—",
+    fields: EV_STATION_FIELDS(s.name, s.city, s.state),
+    confidence: 75 - i * 4, status: "pending",
+    createdAt: new Date(Date.now() - 1000 * 60 * (8 + i * 2)).toISOString(), previewKind: "html",
+  }));
+
+  // ── Dealer Inventory (dealer-inventory) ─────────────────────────────────
+  [
+    { dealer: "AutoNation Ford Scottsdale", city: "Scottsdale", oem: "Ford"   },
+    { dealer: "Hendrick Ford Charlotte",    city: "Charlotte",  oem: "Ford"   },
+    { dealer: "BMW of Beverly Hills",       city: "Beverly Hills", oem: "BMW" },
+  ].forEach((d, i) => items.push({
+    id: `h-deal-${i}`, solutionId: "dealer-inventory", jobId: `j-seed-deal`,
+    workflow: "Dealer Intelligence · Weekly Sync",
+    recordName: d.dealer, summary: d.dealer,
+    detail: "Verify inventory metrics and days-on-lot against DMS feed.",
+    field: "velocity", proposed: "High", current: "—",
+    fields: DEALER_FIELDS(d.dealer, d.city, d.oem),
+    confidence: 72 - i * 5, status: "pending",
+    createdAt: new Date(Date.now() - 1000 * 60 * (5 + i * 3)).toISOString(), previewKind: "html",
+  }));
+
+  return items;
+};
 
 export const usePlatform = create<PlatformState>()(
   persist(
@@ -473,7 +594,7 @@ export const usePlatform = create<PlatformState>()(
       },
     }),
     {
-      name: "xdas-platform-v10",
+      name: "xdas-platform-v11",
       storage: createJSONStorage(() =>
         typeof window !== "undefined"
           ? window.localStorage

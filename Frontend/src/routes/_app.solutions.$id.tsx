@@ -342,7 +342,7 @@ function SolutionDetail() {
             <button
               key={t.id}
               onClick={() => {
-                if (t.id === "insights") {
+                if (t.id === "insights" && solution.id === "news") {
                   window.open("http://3.7.204.198:3000/analysis", "_blank", "noopener,noreferrer");
                   return;
                 }
@@ -451,8 +451,22 @@ function SolutionDetail() {
             />
           </div>
         ) : (
-          <div className="panel p-6 text-sm text-muted-foreground">
-            AI-generated strategic insights surface here once jobs have been run.
+          <div className="panel flex flex-col items-center justify-center gap-5 py-20 text-center">
+            <div className="size-16 rounded-full bg-surface-elevated flex items-center justify-center">
+              <Upload className="size-7 text-muted-foreground/50" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold">Upload data to unlock insights</div>
+              <div className="text-xs text-muted-foreground mt-1.5 max-w-sm leading-relaxed">
+                {solution.id === "ev-charging"
+                  ? "Upload your EV station network data (CSV / XLSX / JSON) to generate charging coverage, whitespace and utilisation insights."
+                  : "Upload your dealer rooftop list and inventory feed to generate per-dealer sell-through, pricing aggressiveness and opportunity insights."}
+              </div>
+            </div>
+            <button className="h-9 px-5 rounded text-xs font-mono flex items-center gap-2 border border-cyan/30 text-cyan bg-cyan/5 hover:bg-cyan/10 transition">
+              <Upload className="size-3.5" /> UPLOAD DATA FILE
+            </button>
+            <div className="text-[10px] font-mono text-muted-foreground/60">Accepts CSV · XLSX · JSON</div>
           </div>
         )
       )}
@@ -1269,7 +1283,12 @@ function SolutionReviewQueue({ solutionId }: { solutionId: string }) {
                     <div className="text-[10px] font-mono text-muted-foreground mt-1">{progress}%</div>
                   </td>
                   <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
-                    {b.startedAt ? new Date(b.startedAt).toLocaleTimeString() : "—"}
+                    {b.startedAt ? (
+                      <>
+                        <div>{new Date(b.startedAt).toLocaleDateString()}</div>
+                        <div className="text-[10px] opacity-70">{new Date(b.startedAt).toLocaleTimeString()}</div>
+                      </>
+                    ) : "—"}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <Link

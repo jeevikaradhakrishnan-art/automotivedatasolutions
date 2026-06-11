@@ -92,7 +92,10 @@ export function JobsTable({
                   <div className="truncate max-w-[260px]">{j.workflow ?? "—"}</div>
                   <div className="text-[10px] font-mono text-muted-foreground truncate max-w-[260px]">{j.source}</div>
                 </td>
-                <td className="px-3 py-2 font-mono text-muted-foreground">{new Date(j.startedAt).toLocaleTimeString()}</td>
+                <td className="px-3 py-2 font-mono text-muted-foreground">
+                  <div>{new Date(j.startedAt).toLocaleDateString()}</div>
+                  <div className="text-[10px] opacity-70">{new Date(j.startedAt).toLocaleTimeString()}</div>
+                </td>
                 <td className="px-3 py-2 font-mono">{fmtRuntime(j)}</td>
                 <td className="px-3 py-2 font-mono">{j.rowsProduced ?? "—"}</td>
                 <td className="px-3 py-2 font-mono text-[11px]">{reviewLabel}</td>

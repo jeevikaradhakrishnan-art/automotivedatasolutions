@@ -94,7 +94,7 @@ const ev: SolutionDef = {
     { name: "Ionity (EU)",        url: "ionity.eu" },
     { name: "Shell Recharge",     url: "shellrecharge.com" },
   ],
-  hasInsights: true,
+  hasInsights: false,
 };
 
 const news: SolutionDef = {
@@ -189,7 +189,7 @@ const dealer: SolutionDef = {
     { name: "Dealer inventory feed (VIN)",url: "scraped" },
     { name: "Sales velocity benchmark",   url: "internal" },
   ],
-  hasInsights: true,
+  hasInsights: false,
 };
 
 const veh: SolutionDef = {

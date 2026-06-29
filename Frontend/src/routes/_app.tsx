@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, Link, useRouterState, useNavigate, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
 import { Command as CommandIcon, LayoutGrid, Sparkles } from "lucide-react";
 import { usePlatform } from "@/store/platform";
@@ -25,21 +25,25 @@ function isTokenValid(token: string): boolean {
 }
 
 export const Route = createFileRoute("/_app")({
-  beforeLoad: () => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("xdas-auth-token");
-      if (!token || !isTokenValid(token)) {
-        throw redirect({ to: "/login" });
-      }
-    }
-  },
   component: AppShell,
 });
 
 function AppShell() {
+  const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
+    const token = localStorage.getItem("xdas-auth-token");
+    if (!token || !isTokenValid(token)) {
+      navigate({ to: "/login", replace: true });
+    } else {
+      setAuthed(true);
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!authed) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -48,7 +52,11 @@ function AppShell() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [authed]);
+
+  if (!authed) {
+    return <div className="h-screen bg-background" />;
+  }
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background text-foreground">

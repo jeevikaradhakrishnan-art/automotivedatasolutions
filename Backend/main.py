@@ -6,13 +6,16 @@ import json
 import glob
 import uuid
 import threading
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import AsyncGenerator, Optional
 
-from fastapi import FastAPI, HTTPException, Query
+import bcrypt
+import jwt as pyjwt
+from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, Response
+from pydantic import BaseModel
 
 app = FastAPI(title="Automotive Data Solutions Bot API")
 
@@ -22,6 +25,75 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Auth ───────────────────────────────────────────────────────────────────────
+
+USERS_FILE = Path(__file__).parent / "users_automotive.json"
+_JWT_SECRET = os.environ.get("XDAS_JWT_SECRET", "xdas-automotive-secret-key-change-in-prod")
+_JWT_ALGORITHM = "HS256"
+_JWT_EXPIRE_DAYS = 30
+
+
+class AuthRequest(BaseModel):
+    email: str
+    password: str
+
+
+def _load_users() -> list[dict]:
+    if not USERS_FILE.exists():
+        return []
+    return json.loads(USERS_FILE.read_text(encoding="utf-8"))
+
+
+def _save_users(users: list[dict]) -> None:
+    USERS_FILE.write_text(json.dumps(users, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _make_token(email: str) -> str:
+    payload = {
+        "sub": email,
+        "exp": datetime.now(tz=timezone.utc) + timedelta(days=_JWT_EXPIRE_DAYS),
+    }
+    return pyjwt.encode(payload, _JWT_SECRET, algorithm=_JWT_ALGORITHM)
+
+
+@app.post("/api/auth/signup")
+def signup(req: AuthRequest):
+    users = _load_users()
+    if any(u["email"].lower() == req.email.lower() for u in users):
+        raise HTTPException(status_code=409, detail="Email already registered. Please sign in.")
+    if len(req.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+    pw_hash = bcrypt.hashpw(req.password.encode(), bcrypt.gensalt()).decode()
+    users.append({"email": req.email, "password_hash": pw_hash, "created_at": datetime.now().isoformat()})
+    _save_users(users)
+    return {"token": _make_token(req.email), "email": req.email}
+
+
+@app.post("/api/auth/login")
+def login(req: AuthRequest):
+    users = _load_users()
+    user = next((u for u in users if u["email"].lower() == req.email.lower()), None)
+    if not user or not bcrypt.checkpw(req.password.encode(), user["password_hash"].encode()):
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+    return {"token": _make_token(req.email), "email": req.email}
+
+
+@app.get("/api/auth/verify")
+def verify_token(authorization: Optional[str] = Header(default=None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    token = authorization.split(" ", 1)[1]
+    try:
+        payload = pyjwt.decode(token, _JWT_SECRET, algorithms=[_JWT_ALGORITHM])
+        return {"email": payload["sub"]}
+    except pyjwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Session expired. Please sign in again.")
+    except pyjwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token.")
+
+
+# ── Bots ───────────────────────────────────────────────────────────────────────
 
 BOT_DIR = Path(__file__).parent.parent / "Bot"
 

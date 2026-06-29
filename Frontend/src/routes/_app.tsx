@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, Link, useRouterState, useNavigate, redirect } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
 import { Command as CommandIcon, LayoutGrid, Sparkles } from "lucide-react";
 import { usePlatform } from "@/store/platform";
@@ -13,7 +13,26 @@ import {
   CommandList,
 } from "@/components/ui/command";
 
+function isTokenValid(token: string): boolean {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return false;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof payload.exp === "number" && payload.exp > Date.now() / 1000;
+  } catch {
+    return false;
+  }
+}
+
 export const Route = createFileRoute("/_app")({
+  beforeLoad: () => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("xdas-auth-token");
+      if (!token || !isTokenValid(token)) {
+        throw redirect({ to: "/login" });
+      }
+    }
+  },
   component: AppShell,
 });
 
@@ -134,7 +153,15 @@ function SubNav() {
 }
 
 function TopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
+  const navigate = useNavigate();
   const runningJobs = usePlatform((s) => s.jobs.filter((j) => j.status === "running").length);
+  const email = typeof window !== "undefined" ? (localStorage.getItem("xdas-auth-email") ?? "") : "";
+
+  const handleLogout = () => {
+    localStorage.removeItem("xdas-auth-token");
+    localStorage.removeItem("xdas-auth-email");
+    navigate({ to: "/login" });
+  };
 
   return (
     <header className="h-14 border-b border-border bg-card/80 backdrop-blur-xl flex items-stretch shadow-sm">
@@ -168,6 +195,22 @@ function TopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
           <span className="size-1.5 rounded-full bg-success pulse-dot" />
           <span>{runningJobs} live job{runningJobs === 1 ? "" : "s"}</span>
         </div>
+      </div>
+
+      {/* User / Logout */}
+      <div className="flex items-center gap-3 px-4 border-l border-border">
+        {email && (
+          <span className="hidden lg:block text-[11px] text-muted-foreground font-mono truncate max-w-[160px]">
+            {email}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="text-xs text-muted-foreground hover:text-foreground px-2.5 h-7 rounded-md border border-border hover:bg-surface-elevated transition"
+        >
+          Sign out
+        </button>
       </div>
     </header>
   );

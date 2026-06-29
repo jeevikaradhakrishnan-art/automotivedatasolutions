@@ -33,6 +33,9 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 
+# ── Auth / User data (persists on server, never committed) ────────────────────
+Backend/users_automotive.json
+
 # ── Logs ──────────────────────────────────────────────────────────────────────
 *.log
 npm-debug.log*
